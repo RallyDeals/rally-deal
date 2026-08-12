@@ -1,6 +1,7 @@
 package com.groupdeal.dealservice.web;
 
 import com.groupdeal.dealservice.service.DealService;
+import com.groupdeal.dealservice.web.dto.HasActiveDealsResponse;
 import com.groupdeal.dealservice.web.dto.LeaveEligibilityResponse;
 import com.groupdeal.dealservice.web.dto.SlotRequest;
 import com.groupdeal.dealservice.web.dto.SlotResponse;
@@ -73,5 +74,15 @@ public class InternalDealController {
     @GetMapping("/{id}/check-leave-eligible")
     public LeaveEligibilityResponse checkLeaveEligible(@PathVariable UUID id) {
         return dealService.checkLeaveEligible(id);
+    }
+
+    /**
+     * Called by Catalog Service to determine if a product has any active or pending deals.
+     * Used to prevent product price changes or deletion.
+     */
+    @GetMapping("/product/{productId}/has-active-deals")
+    public HasActiveDealsResponse hasActiveDeals(@PathVariable UUID productId) {
+        boolean hasActive = dealService.hasActiveDeals(productId);
+        return new HasActiveDealsResponse(productId, hasActive);
     }
 }

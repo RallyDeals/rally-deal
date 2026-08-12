@@ -1,6 +1,7 @@
 package com.groupdeal.dealservice.repository;
 
 import com.groupdeal.dealservice.domain.Deal;
+import com.groupdeal.dealservice.domain.DealStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,6 +20,8 @@ import java.util.UUID;
  * arbitrates concurrency — no optimistic-lock retry loops needed for the hot path.
  */
 public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificationExecutor<Deal> {
+
+    boolean existsByProductIdAndStatusIn(UUID productId, Collection<DealStatus> statuses);
 
     // ── reserve-slot (DS-06, §5.4) ──────────────────────────────────────────────
     // First join flips PENDING→ACTIVE and sets start_time/end_time.

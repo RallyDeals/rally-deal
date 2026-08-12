@@ -121,6 +121,14 @@ public class DealService {
                 .orElseThrow(() -> new DealNotFoundException(dealId));
     }
 
+    @Transactional(readOnly = true)
+    public boolean hasActiveDeals(UUID productId) {
+        return dealRepository.existsByProductIdAndStatusIn(
+                productId,
+                List.of(DealStatus.PENDING, DealStatus.ACTIVE)
+        );
+    }
+
     // ── DS-04 / DS-05: List deals with filtering (§4.1) ────────────────────────
 
     @Transactional(readOnly = true)
