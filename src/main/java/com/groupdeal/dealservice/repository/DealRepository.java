@@ -21,7 +21,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
 
     // ── reserve-slot (DS-06, §5.4) ──────────────────────────────────────────────
     // First join flips PENDING→ACTIVE and sets start_time/end_time.
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET current_participants = current_participants + 1,
@@ -39,7 +39,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
                              @Param("endTime") OffsetDateTime endTime);
 
     // Subsequent joins: deal is already ACTIVE.
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET current_participants = current_participants + 1,
@@ -53,7 +53,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
 
     // ── release-slot (DS-07, §5.5) ──────────────────────────────────────────────
     // Payment declined before authorization — decrements current_participants only.
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET current_participants = current_participants - 1,
@@ -68,7 +68,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
     // ── authorize-slot (DS-11, §5.6) ────────────────────────────────────────────
     // Increments authorized_count. Does NOT flip to succeeded (done in service layer
     // by checking if authorized_count == deal_stock after this update).
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET authorized_count = authorized_count + 1,
@@ -81,7 +81,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
     int authorizeSlot(@Param("dealId") UUID dealId);
 
     // Flip active→succeeded when authorized_count reaches deal_stock (DS-08).
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET status = 'SUCCEEDED',
@@ -95,7 +95,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
 
     // ── release-authorized-slot (DS-12, §5.7) ──────────────────────────────────
     // Decrements BOTH counters (participant left after payment was authorized).
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET current_participants = current_participants - 1,
@@ -115,7 +115,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
     List<Deal> findExpiredActiveDeals(@Param("now") OffsetDateTime now);
 
     // Resolve expired: succeed
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET status = 'SUCCEEDED',
@@ -129,7 +129,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
     int resolveExpiredAsSucceeded(@Param("dealId") UUID dealId, @Param("now") OffsetDateTime now);
 
     // Resolve expired: fail
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE deals
             SET status = 'FAILED',
