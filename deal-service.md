@@ -157,6 +157,7 @@ needed for either — one filterable list endpoint serves both.
 | POST | `/internal/deals/{id}/release-slot` | Order Service | Release a slot whose payment was declined **before** authorization ever succeeded; decrements `current_participants` only |
 | POST | `/internal/deals/{id}/authorize-slot` | Order Service | **NEW.** Marks a reserved slot as payment-authorized; increments `authorized_count`; may flip `active→succeeded` if this fills `deal_stock` |
 | POST | `/internal/deals/{id}/release-authorized-slot` | Order Service | **NEW.** Releases an **already-authorized** slot whose participant subsequently left; decrements both `current_participants` and `authorized_count` |
+| GET | `/internal/deals/product/{productId}/has-active-deals` | Catalog Service | **NEW.** Determines if a product has any active or pending deals; used to prevent product price changes or deletion. |
 
 ---
 
@@ -370,6 +371,21 @@ with `reserve-slot`: joining has no time cutoff and remains legal right up to `e
 only leaving is cut off 10 minutes early, so a late-arriving swap can't itself be undone
 last-minute in a way that would destabilize a deal that's about to resolve.
 
+### 5.9 `GET /internal/deals/product/{productId}/has-active-deals` *(new)*
+
+Called by Catalog Service to determine if a product has any active or pending deals.
+Used to prevent changes to a product's price or deletion if a deal is currently ongoing mapped to that product.
+
+No request body (path param only).
+
+Response `200 OK`:
+```json
+{
+  "productId": "8a2c1f0e-...",
+  "hasActiveDeals": true
+}
+```
+
 ---
 
 ## 6. Communication With Other Services
@@ -389,6 +405,7 @@ rather than contradicting it.
 | Order Service | `release-slot` | Payment declined **before** authorization (§5.5) — confirmed present in Order Service's updated doc |
 | Order Service | `authorize-slot` | `payment.authorized` consumed (§5.6) |
 | Order Service | `release-authorized-slot` | `payment.voided` consumed on the leave path, i.e. `participant.left` → void completes on an already-authorized order (§5.7) |
+| Catalog Service | `has-active-deals` | Before evaluating whether to permit editing or deleting a product catalog entry (§5.9) |
 
 
 ### 6.2 Synchronous (Deal Service as caller)
@@ -499,7 +516,7 @@ Consumers:
 
 | Consumer | What it needs from Deal Service | How it gets it |
 |---|---|---|
-| Catalog Service | Nothing — Deal Service only reads from it | N/A (not a consumer of Deal Service data) |
+| Catalog Service | Whether a product currently has active/pending deals | Sync response from `has-active-deals` (§5.9) |
 | Participation Service | Whether a slot was reserved, plus `dealPrice` (to forward downstream); whether a leave is currently permitted | Sync response from `reserve-slot` (§5.4); sync response from `check-leave-eligible` (§5.8) |
 | Order Service | `dealPrice` at join time; `authorized_count`/`deal_stock` at resolution time; slot-authorize/release acknowledgment | `dealPrice` arrives indirectly via Participation Service's `participant.joined` event; `authorize-slot`/`release-slot`/`release-authorized-slot` are synchronous calls Order Service makes into Deal Service (§5.6/§5.5/§5.7); `deal.succeeded`/`deal.failed` (§6.3) drive Order Service's batch settlement |
 | Inventory Service | `product_id` + unit count to release or finalize | `deal.cancelled` (release), `deal.succeeded` (finalize as sold), `deal.failed` (release) |
