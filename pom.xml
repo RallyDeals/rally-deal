@@ -56,6 +56,13 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
+        <!-- Shared exceptions & global error handler from rally-common -->
+        <dependency>
+            <groupId>com.rally</groupId>
+            <artifactId>rally-common</artifactId>
+            <version>0.3.0</version>
+        </dependency>
+
         <!-- Kafka producer (outbox relay) -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>

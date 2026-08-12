@@ -10,7 +10,12 @@ import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.domain.DealOutbox;
 import com.groupdeal.dealservice.domain.DealSlotRequest;
 import com.groupdeal.dealservice.domain.DealStatus;
-import com.groupdeal.dealservice.exception.*;
+import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
+import com.rally.common.exceptions.domain.deal.DealCancellationNotAllowedException;
+import com.rally.common.exceptions.domain.deal.DealNotFoundException;
+import com.rally.common.exceptions.domain.deal.InvalidDealConfigurationException;
+import com.rally.common.exceptions.domain.inventory.InsufficientStockException;
+import com.rally.common.exceptions.shared.UnauthorizedException;
 import com.groupdeal.dealservice.repository.DealOutboxRepository;
 import com.groupdeal.dealservice.repository.DealRepository;
 import com.groupdeal.dealservice.repository.DealSlotRequestRepository;
@@ -51,24 +56,26 @@ public class DealService {
     @Transactional
     public Deal createDeal(CreateDealRequest request, UUID sellerId) {
         if (request.minParticipants() > request.dealStock()) {
-            throw new MinParticipantsExceedsStockException();
+            throw new InvalidDealConfigurationException(
+                    "min_participants (" + request.minParticipants() + ") cannot exceed deal_stock (" + request.dealStock() + ")");
         }
 
         ProductDto product = catalogClient.getProduct(request.productId())
                 .orElseThrow(() -> new ProductNotFoundException(request.productId()));
 
         if (!product.sellerId().equals(sellerId)) {
-            throw new NotProductOwnerException();
+            throw new UnauthorizedException("You are not the owner of product '" + request.productId() + "'");
         }
 
         if (request.dealPrice().compareTo(product.basePrice()) >= 0) {
-            throw new DealPriceNotBelowOriginalPriceException();
+            throw new InvalidDealConfigurationException(
+                    "deal_price must be strictly less than the product's base_price (" + product.basePrice() + ")");
         }
 
         InventoryReservationResult reservation =
                 inventoryClient.reserve(request.productId(), request.dealStock());
         if (!reservation.success()) {
-            throw new InventoryInsufficientException();
+            throw new InsufficientStockException(request.productId(), request.dealStock(), 0);
         }
 
         Deal deal = new Deal();
@@ -98,10 +105,10 @@ public class DealService {
         Deal deal = getDeal(dealId);
 
         if (!deal.getSellerId().equals(sellerId)) {
-            throw new NotProductOwnerException();
+            throw new UnauthorizedException("You are not the seller of deal '" + dealId + "'");
         }
         if (deal.getStatus() != DealStatus.PENDING) {
-            throw new DealAlreadyStartedException();
+            throw new DealCancellationNotAllowedException(dealId);
         }
 
         deal.setStatus(DealStatus.CANCELLED);
