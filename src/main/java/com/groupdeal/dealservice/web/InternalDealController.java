@@ -8,6 +8,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 /**
  * Internal, service-to-service sync endpoints (design doc §4.2).
  * NOT routed through the API Gateway — called directly by Participation Service
@@ -26,7 +28,7 @@ public class InternalDealController {
      * first successful reservation flips pending→active and sets start_time/end_time.
      */
     @PostMapping("/{id}/reserve-slot")
-    public SlotResponse reserveSlot(@PathVariable Long id,
+    public SlotResponse reserveSlot(@PathVariable UUID id,
                                     @Valid @RequestBody SlotRequest request) {
         return dealService.reserveSlot(id, request.requestId());
     }
@@ -36,7 +38,7 @@ public class InternalDealController {
      * Called by Order Service. Decrements current_participants only.
      */
     @PostMapping("/{id}/release-slot")
-    public SlotResponse releaseSlot(@PathVariable Long id,
+    public SlotResponse releaseSlot(@PathVariable UUID id,
                                     @Valid @RequestBody SlotRequest request) {
         return dealService.releaseSlot(id, request.requestId());
     }
@@ -47,7 +49,7 @@ public class InternalDealController {
      * may flip active→succeeded if this fills deal_stock.
      */
     @PostMapping("/{id}/authorize-slot")
-    public SlotResponse authorizeSlot(@PathVariable Long id,
+    public SlotResponse authorizeSlot(@PathVariable UUID id,
                                       @Valid @RequestBody SlotRequest request) {
         return dealService.authorizeSlot(id, request.requestId());
     }
@@ -58,7 +60,7 @@ public class InternalDealController {
      * Decrements both current_participants and authorized_count.
      */
     @PostMapping("/{id}/release-authorized-slot")
-    public SlotResponse releaseAuthorizedSlot(@PathVariable Long id,
+    public SlotResponse releaseAuthorizedSlot(@PathVariable UUID id,
                                               @Valid @RequestBody SlotRequest request) {
         return dealService.releaseAuthorizedSlot(id, request.requestId());
     }
@@ -69,7 +71,7 @@ public class InternalDealController {
      * Read-only: deal must be active and >10 minutes before end_time.
      */
     @GetMapping("/{id}/check-leave-eligible")
-    public LeaveEligibilityResponse checkLeaveEligible(@PathVariable Long id) {
+    public LeaveEligibilityResponse checkLeaveEligible(@PathVariable UUID id) {
         return dealService.checkLeaveEligible(id);
     }
 }

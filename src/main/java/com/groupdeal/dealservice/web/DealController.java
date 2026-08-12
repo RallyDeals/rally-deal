@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 /**
  * External, gateway-routed endpoints (design doc §4.1).
  *
@@ -28,7 +30,7 @@ public class DealController {
     @PostMapping
     public ResponseEntity<DealResponse> createDeal(
             @Valid @RequestBody CreateDealRequest request,
-            @RequestHeader("X-User-Id") Long sellerId) {
+            @RequestHeader("X-User-Id") UUID sellerId) {
         Deal deal = dealService.createDeal(request, sellerId);
         return ResponseEntity.status(HttpStatus.CREATED).body(DealResponse.from(deal));
     }
@@ -42,8 +44,8 @@ public class DealController {
     @GetMapping
     public Page<DealResponse> listDeals(
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Long sellerId,
-            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) UUID sellerId,
+            @RequestParam(required = false) UUID productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return dealService.findAll(status, sellerId, productId, page, size)
@@ -52,13 +54,13 @@ public class DealController {
 
     /** DS-03: Deal detail (§5.2). */
     @GetMapping("/{id}")
-    public DealResponse getDeal(@PathVariable Long id) {
+    public DealResponse getDeal(@PathVariable UUID id) {
         return DealResponse.from(dealService.getDeal(id));
     }
 
     /** DS-02: Cancel a deal (§5.3). */
     @PostMapping("/{id}/cancel")
-    public DealResponse cancelDeal(@PathVariable Long id, @RequestHeader("X-User-Id") Long sellerId) {
+    public DealResponse cancelDeal(@PathVariable UUID id, @RequestHeader("X-User-Id") UUID sellerId) {
         return DealResponse.from(dealService.cancelDeal(id, sellerId));
     }
 }

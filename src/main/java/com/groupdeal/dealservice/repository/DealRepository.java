@@ -1,9 +1,6 @@
 package com.groupdeal.dealservice.repository;
 
 import com.groupdeal.dealservice.domain.Deal;
-import com.groupdeal.dealservice.domain.DealStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -12,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Guarded-update repository for the deals table (design doc §3–§7).
@@ -19,7 +17,7 @@ import java.util.List;
  * Every slot operation uses a conditional UPDATE (WHERE guards) so the DB itself
  * arbitrates concurrency — no optimistic-lock retry loops needed for the hot path.
  */
-public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificationExecutor<Deal> {
+public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificationExecutor<Deal> {
 
     // ── reserve-slot (DS-06, §5.4) ──────────────────────────────────────────────
     // First join flips PENDING→ACTIVE and sets start_time/end_time.
@@ -36,7 +34,7 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND status = 'PENDING'
               AND current_participants < deal_stock
             """, nativeQuery = true)
-    int reserveSlotFirstJoin(@Param("dealId") Long dealId,
+    int reserveSlotFirstJoin(@Param("dealId") UUID dealId,
                              @Param("startTime") OffsetDateTime startTime,
                              @Param("endTime") OffsetDateTime endTime);
 
@@ -51,7 +49,7 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND status = 'ACTIVE'
               AND current_participants < deal_stock
             """, nativeQuery = true)
-    int reserveSlotActive(@Param("dealId") Long dealId);
+    int reserveSlotActive(@Param("dealId") UUID dealId);
 
     // ── release-slot (DS-07, §5.5) ──────────────────────────────────────────────
     // Payment declined before authorization — decrements current_participants only.
@@ -65,7 +63,7 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND status = 'ACTIVE'
               AND current_participants > 0
             """, nativeQuery = true)
-    int releaseSlot(@Param("dealId") Long dealId);
+    int releaseSlot(@Param("dealId") UUID dealId);
 
     // ── authorize-slot (DS-11, §5.6) ────────────────────────────────────────────
     // Increments authorized_count. Does NOT flip to succeeded (done in service layer
@@ -80,7 +78,7 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND status = 'ACTIVE'
               AND authorized_count < deal_stock
             """, nativeQuery = true)
-    int authorizeSlot(@Param("dealId") Long dealId);
+    int authorizeSlot(@Param("dealId") UUID dealId);
 
     // Flip active→succeeded when authorized_count reaches deal_stock (DS-08).
     @Modifying
@@ -93,7 +91,7 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND status = 'ACTIVE'
               AND authorized_count = deal_stock
             """, nativeQuery = true)
-    int succeedIfFullyAuthorized(@Param("dealId") Long dealId);
+    int succeedIfFullyAuthorized(@Param("dealId") UUID dealId);
 
     // ── release-authorized-slot (DS-12, §5.7) ──────────────────────────────────
     // Decrements BOTH counters (participant left after payment was authorized).
@@ -109,7 +107,7 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND current_participants > 0
               AND authorized_count > 0
             """, nativeQuery = true)
-    int releaseAuthorizedSlot(@Param("dealId") Long dealId);
+    int releaseAuthorizedSlot(@Param("dealId") UUID dealId);
 
     // ── timer sweep (DS-09, §7) ─────────────────────────────────────────────────
     // Find all active deals whose end_time has passed, for the scheduled resolver.
@@ -128,7 +126,7 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND end_time <= :now
               AND authorized_count >= min_participants
             """, nativeQuery = true)
-    int resolveExpiredAsSucceeded(@Param("dealId") Long dealId, @Param("now") OffsetDateTime now);
+    int resolveExpiredAsSucceeded(@Param("dealId") UUID dealId, @Param("now") OffsetDateTime now);
 
     // Resolve expired: fail
     @Modifying
@@ -142,5 +140,5 @@ public interface DealRepository extends JpaRepository<Deal, Long>, JpaSpecificat
               AND end_time <= :now
               AND authorized_count < min_participants
             """, nativeQuery = true)
-    int resolveExpiredAsFailed(@Param("dealId") Long dealId, @Param("now") OffsetDateTime now);
+    int resolveExpiredAsFailed(@Param("dealId") UUID dealId, @Param("now") OffsetDateTime now);
 }

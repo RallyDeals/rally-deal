@@ -4,6 +4,7 @@ import com.groupdeal.dealservice.domain.DealStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 /**
  * Response shape for reserve-slot (§5.4), release-slot (§5.5), authorize-slot (§5.6),
@@ -14,7 +15,7 @@ import java.time.OffsetDateTime;
  */
 public record SlotResponse(
         boolean success,
-        Long dealId,
+        UUID dealId,
         String reason,            // null on success; "DEAL_FULL" | "DEAL_NOT_JOINABLE" on rejection
         BigDecimal dealPrice,     // returned by reserve-slot so Participation Service can forward it
         Integer currentParticipants,
@@ -25,7 +26,7 @@ public record SlotResponse(
         OffsetDateTime endTime
 ) {
     /** Convenience factory for a successful slot response. */
-    public static SlotResponse success(Long dealId, BigDecimal dealPrice,
+    public static SlotResponse success(UUID dealId, BigDecimal dealPrice,
                                        Integer currentParticipants, Integer authorizedCount,
                                        Integer dealStock, DealStatus status,
                                        OffsetDateTime startTime, OffsetDateTime endTime) {
@@ -34,7 +35,7 @@ public record SlotResponse(
     }
 
     /** Convenience factory for a rejected slot response. */
-    public static SlotResponse rejected(Long dealId, String reason) {
+    public static SlotResponse rejected(UUID dealId, String reason) {
         return new SlotResponse(false, dealId, reason, null, null, null, null, null, null, null);
     }
 }

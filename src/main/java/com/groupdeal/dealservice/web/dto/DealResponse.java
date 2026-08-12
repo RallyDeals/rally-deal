@@ -6,15 +6,16 @@ import com.groupdeal.dealservice.domain.DealStatus;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 /**
  * Response shape for POST /deals, GET /deals, GET /deals/{id} (design doc §5.1 / §5.2).
  * timeRemainingSeconds is computed, not stored — null while the deal hasn't started.
  */
 public record DealResponse(
-        Long id,
-        Long productId,
-        Long sellerId,
+        UUID id,
+        UUID productId,
+        UUID sellerId,
         BigDecimal originalPrice,
         BigDecimal dealPrice,
         Integer dealStock,

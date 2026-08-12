@@ -29,10 +29,10 @@ public class DealSlotRequest {
     @Column(name = "request_id")
     private UUID requestId;
 
-    @Column(name = "deal_id", nullable = false)
-    private Long dealId;
+    @Column(name = "deal_id", nullable = false, columnDefinition = "uuid")
+    private UUID dealId;
 
-    /** "RESERVE" | "RELEASE" */
+    /** "RESERVE" | "RELEASE" | "AUTHORIZE" | "RELEASE_AUTHORIZED" */
     @Column(name = "operation", nullable = false)
     private String operation;
 
@@ -48,7 +48,7 @@ public class DealSlotRequest {
         this.createdAt = OffsetDateTime.now();
     }
 
-    public DealSlotRequest(UUID requestId, Long dealId, String operation, String result) {
+    public DealSlotRequest(UUID requestId, UUID dealId, String operation, String result) {
         this.requestId = requestId;
         this.dealId = dealId;
         this.operation = operation;

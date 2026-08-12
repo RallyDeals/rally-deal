@@ -1,6 +1,7 @@
 package com.groupdeal.dealservice.client.dto;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
  * Shape Deal Service expects back from Catalog Service's GET /products/{productId}.
@@ -8,8 +9,8 @@ import java.math.BigDecimal;
  * NOT a full mirror of Catalog Service's product model.
  */
 public record ProductDto(
-        Long productId,
-        Long sellerId,
+        UUID productId,
+        UUID sellerId,
         BigDecimal basePrice
 ) {
 }

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Stand-in for Catalog Service. Returns a plausible product for ANY productId so the
@@ -19,10 +20,13 @@ import java.util.Optional;
 @ConditionalOnProperty(name = "groupdeal.clients.catalog.stub", havingValue = "true", matchIfMissing = true)
 public class CatalogClientStub implements CatalogClient {
 
+    /** Stable stub seller ID — used in tests to match the X-User-Id header. */
+    public static final UUID STUB_SELLER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
     @Override
-    public Optional<ProductDto> getProduct(Long productId) {
+    public Optional<ProductDto> getProduct(UUID productId) {
         // TODO: replace with real HTTP call once Catalog Service exists.
-        // For now: every product "exists", is owned by seller 1, and costs 199.99.
-        return Optional.of(new ProductDto(productId, 1L, new BigDecimal("199.99")));
+        // For now: every product "exists", is owned by STUB_SELLER_ID, and costs 199.99.
+        return Optional.of(new ProductDto(productId, STUB_SELLER_ID, new BigDecimal("199.99")));
     }
 }

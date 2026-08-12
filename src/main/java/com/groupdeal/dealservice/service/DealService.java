@@ -49,7 +49,7 @@ public class DealService {
     // ── DS-01: Create deal (§5.1) ───────────────────────────────────────────────
 
     @Transactional
-    public Deal createDeal(CreateDealRequest request, Long sellerId) {
+    public Deal createDeal(CreateDealRequest request, UUID sellerId) {
         if (request.minParticipants() > request.dealStock()) {
             throw new MinParticipantsExceedsStockException();
         }
@@ -94,7 +94,7 @@ public class DealService {
     // ── DS-02: Cancel deal (§5.3) ───────────────────────────────────────────────
 
     @Transactional
-    public Deal cancelDeal(Long dealId, Long sellerId) {
+    public Deal cancelDeal(UUID dealId, UUID sellerId) {
         Deal deal = getDeal(dealId);
 
         if (!deal.getSellerId().equals(sellerId)) {
@@ -116,7 +116,7 @@ public class DealService {
     // ── DS-03: Get deal detail (§5.2) ───────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Deal getDeal(Long dealId) {
+    public Deal getDeal(UUID dealId) {
         return dealRepository.findById(dealId)
                 .orElseThrow(() -> new DealNotFoundException(dealId));
     }
@@ -124,7 +124,7 @@ public class DealService {
     // ── DS-04 / DS-05: List deals with filtering (§4.1) ────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<Deal> findAll(String status, Long sellerId, Long productId, int page, int size) {
+    public Page<Deal> findAll(String status, UUID sellerId, UUID productId, int page, int size) {
         Specification<Deal> spec = Specification.where(null);
 
         if (status != null && !status.isBlank()) {
@@ -148,7 +148,7 @@ public class DealService {
     // ── DS-06: Reserve slot (§5.4) ──────────────────────────────────────────────
 
     @Transactional
-    public SlotResponse reserveSlot(Long dealId, UUID requestId) {
+    public SlotResponse reserveSlot(UUID dealId, UUID requestId) {
         // Idempotency check
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
@@ -199,7 +199,7 @@ public class DealService {
     // Payment declined before authorization — decrements current_participants only.
 
     @Transactional
-    public SlotResponse releaseSlot(Long dealId, UUID requestId) {
+    public SlotResponse releaseSlot(UUID dealId, UUID requestId) {
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
             Deal deal = getDeal(dealId);
@@ -225,7 +225,7 @@ public class DealService {
     // Marks a reserved slot as payment-authorized. May flip active→succeeded.
 
     @Transactional
-    public SlotResponse authorizeSlot(Long dealId, UUID requestId) {
+    public SlotResponse authorizeSlot(UUID dealId, UUID requestId) {
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
             Deal deal = getDeal(dealId);
@@ -261,7 +261,7 @@ public class DealService {
     // Participant left after payment was authorized — decrements both counters.
 
     @Transactional
-    public SlotResponse releaseAuthorizedSlot(Long dealId, UUID requestId) {
+    public SlotResponse releaseAuthorizedSlot(UUID dealId, UUID requestId) {
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
             Deal deal = getDeal(dealId);
@@ -287,7 +287,7 @@ public class DealService {
     // Read-only permission check — deal must be active and >10 min before end_time.
 
     @Transactional(readOnly = true)
-    public LeaveEligibilityResponse checkLeaveEligible(Long dealId) {
+    public LeaveEligibilityResponse checkLeaveEligible(UUID dealId) {
         Deal deal = getDeal(dealId);
 
         if (deal.getStatus() != DealStatus.ACTIVE) {
@@ -335,7 +335,7 @@ public class DealService {
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private void recordSlotRequest(UUID requestId, Long dealId, String operation, String result) {
+    private void recordSlotRequest(UUID requestId, UUID dealId, String operation, String result) {
         dealSlotRequestRepository.save(new DealSlotRequest(requestId, dealId, operation, result));
     }
 
@@ -352,7 +352,7 @@ public class DealService {
         );
     }
 
-    private void writeOutbox(Long dealId, String eventType, Map<String, Object> payload) {
+    private void writeOutbox(UUID dealId, String eventType, Map<String, Object> payload) {
         try {
             String json = objectMapper.writeValueAsString(payload);
             dealOutboxRepository.save(new DealOutbox(dealId, eventType, json));

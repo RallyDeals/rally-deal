@@ -3,6 +3,7 @@ package com.groupdeal.dealservice.client;
 import com.groupdeal.dealservice.client.dto.ProductDto;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Sync dependency on Catalog Service (design doc §6.2).
@@ -15,5 +16,5 @@ public interface CatalogClient {
     /**
      * @return empty if the product doesn't exist (maps to 404 PRODUCT_NOT_FOUND).
      */
-    Optional<ProductDto> getProduct(Long productId);
+    Optional<ProductDto> getProduct(UUID productId);
 }

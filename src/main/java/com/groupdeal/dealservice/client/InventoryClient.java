@@ -2,6 +2,8 @@ package com.groupdeal.dealservice.client;
 
 import com.groupdeal.dealservice.client.dto.InventoryReservationResult;
 
+import java.util.UUID;
+
 /**
  * Sync dependency on Inventory Service (design doc §6.2).
  * Two implementations wired via `groupdeal.clients.inventory.stub` (application.yml):
@@ -10,7 +12,7 @@ import com.groupdeal.dealservice.client.dto.InventoryReservationResult;
  */
 public interface InventoryClient {
 
-    InventoryReservationResult reserve(Long productId, Integer quantity);
+    InventoryReservationResult reserve(UUID productId, Integer quantity);
 
-    void release(Long productId, Integer quantity);
+    void release(UUID productId, Integer quantity);
 }

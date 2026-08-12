@@ -1,5 +1,6 @@
 package com.groupdeal.dealservice.domain;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -7,15 +8,15 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 /**
- * Maps directly to the `deals` table (see V1__create_deals_table.sql / design doc §3).
+ * Maps directly to the `deals` table (see V1/V3 migrations / design doc §3).
  *
  * All state transitions MUST go through guarded, conditional UPDATEs
  * (e.g. "WHERE status = 'ACTIVE' AND current_participants < deal_stock"),
  * never a plain save() after a blind read-modify-write — that's the whole
  * point of the schema's CHECK constraints and the `version` column.
- * The actual guarded-update methods live on DealRepository (step 4 — not yet implemented).
  */
 @Entity
 @Table(name = "deals")
@@ -25,14 +26,14 @@ import java.time.OffsetDateTime;
 public class Deal {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(columnDefinition = "uuid")
+    private UUID id;
 
-    @Column(name = "product_id", nullable = false)
-    private Long productId;
+    @Column(name = "product_id", nullable = false, columnDefinition = "uuid")
+    private UUID productId;
 
-    @Column(name = "seller_id", nullable = false)
-    private Long sellerId;
+    @Column(name = "seller_id", nullable = false, columnDefinition = "uuid")
+    private UUID sellerId;
 
     /** Snapshot of the product's base_price from Catalog Service at creation time. Never updated afterward. */
     @Column(name = "original_price", nullable = false, precision = 10, scale = 2)
@@ -84,6 +85,9 @@ public class Deal {
 
     @PrePersist
     void onCreate() {
+        if (this.id == null) {
+            this.id = UuidCreator.getTimeOrderedEpoch(); // UUID v7
+        }
         OffsetDateTime now = OffsetDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;

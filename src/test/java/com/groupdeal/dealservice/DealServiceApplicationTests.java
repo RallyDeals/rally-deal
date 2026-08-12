@@ -15,6 +15,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 
+import java.util.UUID;
+import com.groupdeal.dealservice.client.CatalogClientStub;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -52,15 +54,16 @@ class DealServiceApplicationTests {
 
     @Test
     void createDeal_persistsWithCorrectDefaults() {
+        UUID productId = UUID.randomUUID();
         CreateDealRequest request = new CreateDealRequest(
-                4821L,
+                productId,
                 new BigDecimal("149.99"),
                 100,
                 40,
                 1440
         );
 
-        Deal deal = dealService.createDeal(request, 331L);
+        Deal deal = dealService.createDeal(request, CatalogClientStub.STUB_SELLER_ID);
 
         assertThat(deal.getId()).isNotNull();
         assertThat(deal.getStatus()).isEqualTo(DealStatus.PENDING);
