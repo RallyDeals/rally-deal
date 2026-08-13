@@ -13,3 +13,6 @@ target/
 .classpath
 .project
 .agent/
+.env
+start.sh
+stop.sh
