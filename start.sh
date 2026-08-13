@@ -16,7 +16,18 @@ docker-compose up -d postgres kafka
 
 # 2. Build the deal-service Docker image
 echo "🔨 Step 2: Building deal-service Docker image..."
-docker build -t code-v1_deal-service:latest .
+
+# 👇 required for --mount=type=secret and --mount=type=cache to work
+export DOCKER_BUILDKIT=1
+
+# 👇 your GitHub username + PAT (needs read:packages scope)
+GITHUB_ACTOR="${GITHUB_ACTOR:-your-github-username}"
+GITHUB_TOKEN="${GITHUB_TOKEN:?Set GITHUB_TOKEN env var with a GitHub PAT (read:packages scope)}"
+
+docker build \
+  --build-arg GITHUB_ACTOR="$GITHUB_ACTOR" \
+  --secret id=github_token,env=GITHUB_TOKEN \
+  -t code-v1_deal-service:latest .
 
 # 3. Remove old deal-service container if running
 echo "🧹 Step 3: Cleaning up old container instances..."
