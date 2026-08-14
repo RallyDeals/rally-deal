@@ -57,7 +57,8 @@ public class DealService {
     public Deal createDeal(CreateDealRequest request, UUID sellerId) {
         if (request.minParticipants() > request.dealStock()) {
             throw new InvalidDealConfigurationException(
-                    "min_participants (" + request.minParticipants() + ") cannot exceed deal_stock (" + request.dealStock() + ")");
+                    "min_participants (" + request.minParticipants() + ") cannot exceed deal_stock ("
+                            + request.dealStock() + ")");
         }
 
         ProductDto product = catalogClient.getProduct(request.productId())
@@ -72,8 +73,7 @@ public class DealService {
                     "deal_price must be strictly less than the product's base_price (" + product.basePrice() + ")");
         }
 
-        InventoryReservationResult reservation =
-                inventoryClient.reserve(request.productId(), request.dealStock());
+        InventoryReservationResult reservation = inventoryClient.reserve(request.productId(), request.dealStock());
         if (!reservation.success()) {
             throw new InsufficientStockException(request.productId(), request.dealStock(), 0);
         }
@@ -114,7 +114,8 @@ public class DealService {
         deal.setStatus(DealStatus.CANCELLED);
         Deal saved = dealRepository.save(deal);
 
-        // Outbox: deal.cancelled (§6.3) — Inventory Service needs to release reserved stock
+        // Outbox: deal.cancelled (§6.3) — Inventory Service needs to release reserved
+        // stock
         writeOutbox(saved.getId(), "deal.cancelled", buildDealCancelledPayload(saved));
 
         return saved;
@@ -132,8 +133,7 @@ public class DealService {
     public boolean hasActiveDeals(UUID productId) {
         return dealRepository.existsByProductIdAndStatusIn(
                 productId,
-                List.of(DealStatus.PENDING, DealStatus.ACTIVE)
-        );
+                List.of(DealStatus.PENDING, DealStatus.ACTIVE));
     }
 
     // ── DS-04 / DS-05: List deals with filtering (§4.1) ────────────────────────
@@ -171,7 +171,7 @@ public class DealService {
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
-                return SlotResponse.rejected(dealId, "DEAL_NOT_JOINABLE");
+                return SlotResponse.rejected(dealId, "PREVIOUSLY_REJECTED");
             }
         }
 
@@ -190,7 +190,7 @@ public class DealService {
         }
 
         // Try subsequent-join (already active) path
-        if (deal.getStatus() == DealStatus.PENDING || deal.getStatus() == DealStatus.ACTIVE) {
+        if (deal.getStatus() == DealStatus.ACTIVE) {
             int rows = dealRepository.reserveSlotActive(dealId);
             if (rows > 0) {
                 recordSlotRequest(requestId, dealId, "RESERVE", "SUCCESS");
@@ -204,7 +204,7 @@ public class DealService {
         if (deal.getStatus() == DealStatus.ACTIVE && deal.getCurrentParticipants() >= deal.getDealStock()) {
             reason = "DEAL_FULL";
         } else {
-            reason = "DEAL_NOT_JOINABLE";
+            reason = "DEAL_NOT_ACTIVE_" + deal.getStatus().name();
         }
         recordSlotRequest(requestId, dealId, "RESERVE", "REJECTED");
         return SlotResponse.rejected(dealId, reason);
@@ -221,19 +221,24 @@ public class DealService {
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
-                return SlotResponse.rejected(dealId, "DEAL_NOT_JOINABLE");
+                return SlotResponse.rejected(dealId, "PREVIOUSLY_REJECTED");
             }
+        }
+
+        Deal deal = getDeal(dealId);
+        if (deal.getCurrentParticipants() <= 0) {
+            recordSlotRequest(requestId, dealId, "RELEASE", "REJECTED");
+            return SlotResponse.rejected(dealId, "NO_SLOTS_TO_RELEASE");
         }
 
         int rows = dealRepository.releaseSlot(dealId);
         if (rows > 0) {
             recordSlotRequest(requestId, dealId, "RELEASE", "SUCCESS");
-            Deal updated = getDeal(dealId);
-            return buildSlotSuccess(updated);
+            return buildSlotSuccess(getDeal(dealId));
         }
 
         recordSlotRequest(requestId, dealId, "RELEASE", "REJECTED");
-        return SlotResponse.rejected(dealId, "DEAL_NOT_JOINABLE");
+        return SlotResponse.rejected(dealId, "DEAL_NOT_ACTIVE_" + deal.getStatus().name());
     }
 
     // ── DS-11: Authorize slot (§5.6) ────────────────────────────────────────────
@@ -247,8 +252,14 @@ public class DealService {
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
-                return SlotResponse.rejected(dealId, "DEAL_NOT_JOINABLE");
+                return SlotResponse.rejected(dealId, "PREVIOUSLY_REJECTED");
             }
+        }
+
+        Deal deal = getDeal(dealId);
+        if (deal.getAuthorizedCount() >= deal.getCurrentParticipants()) {
+            recordSlotRequest(requestId, dealId, "AUTHORIZE", "REJECTED");
+            return SlotResponse.rejected(dealId, "AUTHORIZED_COUNT_EXCEEDS_PARTICIPANTS");
         }
 
         int rows = dealRepository.authorizeSlot(dealId);
@@ -269,7 +280,7 @@ public class DealService {
         }
 
         recordSlotRequest(requestId, dealId, "AUTHORIZE", "REJECTED");
-        return SlotResponse.rejected(dealId, "DEAL_NOT_JOINABLE");
+        return SlotResponse.rejected(dealId, "DEAL_NOT_ACTIVE_" + deal.getStatus().name());
     }
 
     // ── DS-12: Release authorized slot (§5.7) ──────────────────────────────────
@@ -283,19 +294,24 @@ public class DealService {
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
-                return SlotResponse.rejected(dealId, "DEAL_NOT_JOINABLE");
+                return SlotResponse.rejected(dealId, "PREVIOUSLY_REJECTED");
             }
+        }
+
+        Deal deal = getDeal(dealId);
+        if (deal.getAuthorizedCount() <= 0) {
+            recordSlotRequest(requestId, dealId, "RELEASE_AUTHORIZED", "REJECTED");
+            return SlotResponse.rejected(dealId, "NO_AUTHORIZED_SLOTS_TO_RELEASE");
         }
 
         int rows = dealRepository.releaseAuthorizedSlot(dealId);
         if (rows > 0) {
             recordSlotRequest(requestId, dealId, "RELEASE_AUTHORIZED", "SUCCESS");
-            Deal updated = getDeal(dealId);
-            return buildSlotSuccess(updated);
+            return buildSlotSuccess(getDeal(dealId));
         }
 
         recordSlotRequest(requestId, dealId, "RELEASE_AUTHORIZED", "REJECTED");
-        return SlotResponse.rejected(dealId, "DEAL_NOT_JOINABLE");
+        return SlotResponse.rejected(dealId, "DEAL_NOT_ACTIVE_" + deal.getStatus().name());
     }
 
     // ── DS-13: Check leave eligibility (§5.8) ──────────────────────────────────
@@ -363,8 +379,7 @@ public class DealService {
                 deal.getDealStock(),
                 deal.getStatus(),
                 deal.getStartTime(),
-                deal.getEndTime()
-        );
+                deal.getEndTime());
     }
 
     private void writeOutbox(UUID dealId, String eventType, Map<String, Object> payload) {
