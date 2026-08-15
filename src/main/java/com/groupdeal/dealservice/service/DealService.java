@@ -259,7 +259,7 @@ public class DealService {
         Deal deal = getDeal(dealId);
         if (deal.getAuthorizedCount() >= deal.getCurrentParticipants()) {
             recordSlotRequest(requestId, dealId, "AUTHORIZE", "REJECTED");
-            return SlotResponse.rejected(dealId, "AUTHORIZED_COUNT_CAN'T_EXCEEDS_PARTICIPANTS");
+            return SlotResponse.rejected(dealId, "AUTHORIZED_COUNT_CAN'T_EXCEED_PARTICIPANTS");
         }
 
         int rows = dealRepository.authorizeSlot(dealId);
