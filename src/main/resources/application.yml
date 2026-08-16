@@ -39,7 +39,8 @@ management:
 groupdeal:
   clients:
     catalog:
-      stub: true            # flip to false once Catalog Service exists (see CatalogClient)
+      # Override per-env with GROUPDEAL_CLIENTS_CATALOG_STUB=true to fall back to the stub.
+      stub: false           # active real HTTP client
       base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
     inventory:
       stub: true            # flip to false once Inventory Service exists (see InventoryClient)
