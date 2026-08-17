@@ -17,7 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Single-node Kafka in KRaft mode (no separate Zookeeper needed).
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     ports:
@@ -35,7 +34,12 @@ services:
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
 
   deal-service:
-    build: .
+    build:
+      context: .
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR}
+      secrets:
+        - github_token
     ports:
       - "8081:8081"
     environment:
@@ -45,11 +49,21 @@ services:
       DB_USER: groupdeal
       DB_PASSWORD: groupdeal
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CATALOG_SERVICE_URL: http://catalog-service:8083
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_started
 
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN
+
 volumes:
   deal-service-pgdata:
+
+networks:
+  default:
+    name: groupdeal-net
+    external: true
