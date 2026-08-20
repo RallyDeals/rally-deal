@@ -1,5 +1,7 @@
 package com.groupdeal.dealservice.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.groupdeal.dealservice.client.dto.ProductDto;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
@@ -10,10 +12,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Component
@@ -21,17 +23,18 @@ import java.util.UUID;
 public class CatalogClientHttp implements CatalogClient {
 
     private final RestClient restClient;
+    private final ObjectMapper objectMapper;
 
     public CatalogClientHttp(
             RestClient.Builder restClientBuilder,
+            ObjectMapper objectMapper,
             @Value("${groupdeal.clients.catalog.base-url}") String baseUrl) {
+        this.objectMapper = objectMapper;
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(2))
                 .build();
-        
+
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        // TimeLimiter doesn't apply to blocking RestClient calls, so the timeout
-        // has to live on the HTTP client itself (matches timelimiter.catalogService=3s).
         requestFactory.setReadTimeout(Duration.ofSeconds(3));
 
         this.restClient = restClientBuilder
@@ -44,28 +47,50 @@ public class CatalogClientHttp implements CatalogClient {
     @CircuitBreaker(name = "catalogService", fallbackMethod = "getProductFallback")
     public Optional<ProductDto> getProduct(UUID productId) {
         try {
-            ProductDto productDto = restClient.get()
+            JsonNode json = restClient.get()
                     .uri("/products/{id}", productId)
                     .retrieve()
-                    .body(ProductDto.class);
+                    .body(JsonNode.class);
 
-            // A 200 with an empty/null body is a bug on Catalog's side, not a 404 —
-            // do not silently map it to "product not found".
-            if (productDto == null) {
+            if (json == null || json.isNull()) {
                 throw new IllegalStateException("Catalog Service returned an empty body for product " + productId);
             }
-            return Optional.of(productDto);
+
+            return Optional.of(mapToProductDto(productId, json));
         } catch (HttpClientErrorException.NotFound e) {
             log.info("Catalog Service returned 404 for product {}", productId);
             return Optional.empty();
         }
     }
 
-    /**
-     * Invoked by the circuit breaker on any failing catalog call (timeout, 5xx,
-     * connect failure, or open circuit). Returning empty would be wrong — that maps
-     * to 404 PRODUCT_NOT_FOUND downstream, not "catalog is down" — so rethrow.
-     */
+    @Override
+    public Map<UUID, ProductDto> getProducts(Collection<UUID> productIds) {
+        Map<UUID, ProductDto> map = new HashMap<>();
+        for (UUID pid : productIds) {
+            try {
+                getProduct(pid).ifPresent(dto -> map.put(pid, dto));
+            } catch (Exception e) {
+                log.warn("Failed to fetch product {}: {}", pid, e.getMessage());
+            }
+        }
+        return map;
+    }
+
+    private ProductDto mapToProductDto(UUID productId, JsonNode json) {
+        String name = json.has("name") ? json.get("name").asText(null) : null;
+        String imageUrl = json.has("imageUrl") ? json.get("imageUrl").asText(null) : null;
+        String category = null;
+        if (json.has("category") && json.get("category") != null && !json.get("category").isNull()) {
+            JsonNode cat = json.get("category");
+            category = cat.has("name") ? cat.get("name").asText(null) : null;
+        }
+        String sku = json.has("sku") ? json.get("sku").asText(null) : null;
+        String sellerName = json.has("sellerName") ? json.get("sellerName").asText(null) : null;
+        BigDecimal basePrice = json.has("basePrice") ? json.get("basePrice").decimalValue() : null;
+
+        return new ProductDto(productId, null, basePrice, name, imageUrl, category, sku, sellerName);
+    }
+
     @SuppressWarnings("unused")
     private Optional<ProductDto> getProductFallback(UUID productId, Throwable t) {
         log.error("Catalog Service unavailable while fetching product {} (circuit open or request failed)", productId, t);

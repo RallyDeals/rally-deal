@@ -20,8 +20,10 @@ import com.groupdeal.dealservice.repository.DealOutboxRepository;
 import com.groupdeal.dealservice.repository.DealRepository;
 import com.groupdeal.dealservice.repository.DealSlotRequestRepository;
 import com.groupdeal.dealservice.web.dto.CreateDealRequest;
+import com.groupdeal.dealservice.web.dto.DealAnalyticsResponse;
 import com.groupdeal.dealservice.web.dto.LeaveEligibilityResponse;
 import com.groupdeal.dealservice.web.dto.SlotResponse;
+import com.groupdeal.dealservice.web.dto.UpdateDealRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,7 +32,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.*;
 
 /**
@@ -96,6 +102,38 @@ public class DealService {
         writeOutbox(saved.getId(), "deal.created", buildDealCreatedPayload(saved));
 
         return saved;
+    }
+
+    // ── DS-01b: Update deal (only while PENDING + no participants) ───────────────
+
+    @Transactional
+    public Deal updateDeal(UUID dealId, UpdateDealRequest request, UUID sellerId) {
+        Deal deal = getDeal(dealId);
+
+        if (!deal.getSellerId().equals(sellerId)) {
+            throw new UnauthorizedException("You are not the seller of deal '" + dealId + "'");
+        }
+        if (deal.getStatus() != DealStatus.PENDING) {
+            throw new DealCancellationNotAllowedException(dealId);
+        }
+        if (deal.getCurrentParticipants() > 0) {
+            throw new InvalidDealConfigurationException(
+                    "Cannot update deal '" + dealId + "' — " + deal.getCurrentParticipants()
+                            + " participant(s) already joined. You must cancel this deal and create a new one.");
+        }
+
+        if (request.minParticipants() > request.dealStock()) {
+            throw new InvalidDealConfigurationException(
+                    "min_participants (" + request.minParticipants() + ") cannot exceed deal_stock ("
+                            + request.dealStock() + ")");
+        }
+
+        deal.setDealPrice(request.dealPrice());
+        deal.setDealStock(request.dealStock());
+        deal.setMinParticipants(request.minParticipants());
+        deal.setDurationMinutes(request.durationMinutes());
+
+        return dealRepository.save(deal);
     }
 
     // ── DS-02: Cancel deal (§5.3) ───────────────────────────────────────────────
@@ -362,6 +400,43 @@ public class DealService {
                 }
             }
         }
+    }
+
+    // ── Analytics ───────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public DealAnalyticsResponse getAnalytics(UUID sellerId) {
+        long total;
+        long active;
+        long createdThisMonth;
+        long createdToday;
+        long completed;
+        long succeeded;
+
+        OffsetDateTime monthStart = YearMonth.now().atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+        OffsetDateTime dayStart = OffsetDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+
+        if (sellerId != null) {
+            total = dealRepository.countBySellerId(sellerId);
+            active = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.ACTIVE);
+            createdThisMonth = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, monthStart, OffsetDateTime.now());
+            createdToday = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, dayStart, OffsetDateTime.now());
+            completed = dealRepository.countBySellerIdAndStatusIn(sellerId, List.of(DealStatus.SUCCEEDED, DealStatus.FAILED));
+            succeeded = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.SUCCEEDED);
+        } else {
+            total = dealRepository.count();
+            active = dealRepository.countByStatus(DealStatus.ACTIVE);
+            createdThisMonth = dealRepository.countByCreatedAtBetween(monthStart, OffsetDateTime.now());
+            createdToday = dealRepository.countByCreatedAtBetween(dayStart, OffsetDateTime.now());
+            completed = dealRepository.countByStatusIn(List.of(DealStatus.SUCCEEDED, DealStatus.FAILED));
+            succeeded = dealRepository.countByStatus(DealStatus.SUCCEEDED);
+        }
+
+        BigDecimal successRate = completed > 0
+                ? BigDecimal.valueOf(succeeded).multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(completed), 1, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        return new DealAnalyticsResponse(total, createdThisMonth, active, createdToday, completed, successRate);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────

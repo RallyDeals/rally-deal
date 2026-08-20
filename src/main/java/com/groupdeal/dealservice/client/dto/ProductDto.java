@@ -5,12 +5,19 @@ import java.util.UUID;
 
 /**
  * Shape Deal Service expects back from Catalog Service's GET /products/{productId}.
- * Trimmed to only what Deal Service actually needs (ownership + base price) —
- * NOT a full mirror of Catalog Service's product model.
+ * Includes display fields needed for DealResponse enrichment.
  */
 public record ProductDto(
         UUID productId,
         UUID sellerId,
-        BigDecimal basePrice
+        BigDecimal basePrice,
+        String name,
+        String imageUrl,
+        String category,
+        String sku,
+        String sellerName
 ) {
+    public ProductDto(UUID productId, UUID sellerId, BigDecimal basePrice) {
+        this(productId, sellerId, basePrice, null, null, null, null, null);
+    }
 }
