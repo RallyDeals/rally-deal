@@ -31,11 +31,11 @@ public class CatalogClientHttp implements CatalogClient {
             @Value("${groupdeal.clients.catalog.base-url}") String baseUrl) {
         this.objectMapper = objectMapper;
         HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(2))
+                .connectTimeout(Duration.ofSeconds(5))
                 .build();
 
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(Duration.ofSeconds(3));
+        requestFactory.setReadTimeout(Duration.ofSeconds(10));
 
         this.restClient = restClientBuilder
                 .baseUrl(baseUrl)
@@ -85,10 +85,12 @@ public class CatalogClientHttp implements CatalogClient {
             category = cat.has("name") ? cat.get("name").asText(null) : null;
         }
         String sku = json.has("sku") ? json.get("sku").asText(null) : null;
+        String sellerIdStr = json.has("sellerId") ? json.get("sellerId").asText(null) : null;
+        UUID sellerId = sellerIdStr != null ? UUID.fromString(sellerIdStr) : null;
         String sellerName = json.has("sellerName") ? json.get("sellerName").asText(null) : null;
         BigDecimal basePrice = json.has("basePrice") ? json.get("basePrice").decimalValue() : null;
 
-        return new ProductDto(productId, null, basePrice, name, imageUrl, category, sku, sellerName);
+        return new ProductDto(productId, sellerId, basePrice, name, imageUrl, category, sku, sellerName);
     }
 
     @SuppressWarnings("unused")

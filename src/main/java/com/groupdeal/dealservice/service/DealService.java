@@ -223,6 +223,8 @@ public class DealService {
             if (rows > 0) {
                 recordSlotRequest(requestId, dealId, "RESERVE", "SUCCESS");
                 Deal updated = getDeal(dealId);
+                // Outbox: deal.activated — catalog needs PENDING→ACTIVE transition
+                writeOutbox(updated.getId(), "deal.activated", buildDealActivatedPayload(updated));
                 return buildSlotSuccess(updated);
             }
         }
@@ -413,7 +415,7 @@ public class DealService {
         long completed;
         long succeeded;
 
-        OffsetDateTime monthStart = YearMonth.now().atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+        OffsetDateTime monthStart = YearMonth.now().atDay(1).atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
         OffsetDateTime dayStart = OffsetDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
 
         if (sellerId != null) {
@@ -481,6 +483,23 @@ public class DealService {
         payload.put("deal_stock", deal.getDealStock());
         payload.put("min_participants", deal.getMinParticipants());
         payload.put("duration_minutes", deal.getDurationMinutes());
+        return payload;
+    }
+
+    private Map<String, Object> buildDealActivatedPayload(Deal deal) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("event_id", UUID.randomUUID().toString());
+        payload.put("event_type", "deal.activated");
+        payload.put("occurred_at", OffsetDateTime.now().toString());
+        payload.put("deal_id", deal.getId());
+        payload.put("product_id", deal.getProductId());
+        payload.put("deal_price", deal.getDealPrice());
+        payload.put("deal_stock", deal.getDealStock());
+        payload.put("current_participants", deal.getCurrentParticipants());
+        payload.put("min_participants", deal.getMinParticipants());
+        payload.put("duration_minutes", deal.getDurationMinutes());
+        payload.put("start_time", deal.getStartTime() != null ? deal.getStartTime().toString() : null);
+        payload.put("end_time", deal.getEndTime() != null ? deal.getEndTime().toString() : null);
         return payload;
     }
 
