@@ -11,7 +11,6 @@ import com.rally.common.exceptions.domain.deal.DealCancellationNotAllowedExcepti
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -33,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @Testcontainers
 @ActiveProfiles("test")
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class DealLifecycleIntegrationTest {
 
     @Container
@@ -79,10 +77,11 @@ class DealLifecycleIntegrationTest {
     @Test
     void createDeal_persists_outboxEvent() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
-        var events = dealOutboxRepository.findAll();
+        var events = dealOutboxRepository.findAll().stream()
+                .filter(e -> e.getDealId().equals(deal.getId()))
+                .toList();
 
         assertThat(events).hasSize(1);
-        assertThat(events.get(0).getDealId()).isEqualTo(deal.getId());
         assertThat(events.get(0).getEventType()).isEqualTo("deal.created");
     }
 

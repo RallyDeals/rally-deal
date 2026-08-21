@@ -72,26 +72,30 @@ class DealReserveSlotConcurrencyTest {
 
         // Fire 20 threads simultaneously, each with a unique requestId
         List<Future<SlotResponse>> futures = new ArrayList<>();
-        try (ExecutorService pool = Executors.newFixedThreadPool(THREADS)) {
+        ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+        try {
             for (int i = 0; i < THREADS; i++) {
                 UUID requestId = UUID.randomUUID();
                 futures.add(pool.submit(() -> dealService.reserveSlot(deal.getId(), requestId)));
             }
-        } // pool.close() waits for all tasks to finish (Java 21 implements AutoCloseable)
 
-        List<SlotResponse> responses = new ArrayList<>();
-        for (Future<SlotResponse> f : futures) {
-            responses.add(f.get());
+            List<SlotResponse> responses = new ArrayList<>();
+            for (Future<SlotResponse> f : futures) {
+                responses.add(f.get());
+            }
+
+            long successes  = responses.stream().filter(SlotResponse::success).count();
+            long rejections = responses.stream().filter(r -> !r.success()).count();
+
+            assertThat(successes).isEqualTo(STOCK);
+            assertThat(rejections).isEqualTo(THREADS - STOCK);
+
+            // The DB counter must also match — never exceeded stock
+            var finalDeal = dealService.getDeal(deal.getId());
+            assertThat(finalDeal.getCurrentParticipants()).isEqualTo(STOCK);
+        } finally {
+            pool.shutdown();
         }
 
-        long successes  = responses.stream().filter(SlotResponse::success).count();
-        long rejections = responses.stream().filter(r -> !r.success()).count();
-
-        assertThat(successes).isEqualTo(STOCK);
-        assertThat(rejections).isEqualTo(THREADS - STOCK);
-
-        // The DB counter must also match — never exceeded stock
-        var finalDeal = dealService.getDeal(deal.getId());
-        assertThat(finalDeal.getCurrentParticipants()).isEqualTo(STOCK);
     }
 }
