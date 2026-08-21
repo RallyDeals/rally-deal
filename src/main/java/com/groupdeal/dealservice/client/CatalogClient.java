@@ -19,9 +19,4 @@ public interface CatalogClient {
      * @return empty if the product doesn't exist (maps to 404 PRODUCT_NOT_FOUND).
      */
     Optional<ProductDto> getProduct(UUID productId);
-
-    /**
-     * Batch fetch — returns a map keyed by productId. Missing products are omitted.
-     */
-    Map<UUID, ProductDto> getProducts(Collection<UUID> productIds);
 }

@@ -27,25 +27,20 @@ import java.util.stream.Collectors;
 public class DealController {
 
     private final DealService dealService;
-    private final CatalogClient catalogClient;
 
     @PostMapping
     public ResponseEntity<DealResponse> createDeal(
             @Valid @RequestBody CreateDealRequest request,
             @RequestHeader("X-User-Id") UUID sellerId) {
-        Deal deal = dealService.createDeal(request, sellerId);
-        ProductDto product = catalogClient.getProduct(request.productId()).orElse(null);
-        return ResponseEntity.status(HttpStatus.CREATED).body(DealResponse.from(deal, product));
+        return ResponseEntity.status(HttpStatus.CREATED).body(dealService.createDeal(request, sellerId));
     }
 
     @PatchMapping("/{id}")
-    public DealResponse updateDeal(
+    public ResponseEntity<DealResponse> updateDeal(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateDealRequest request,
             @RequestHeader("X-User-Id") UUID sellerId) {
-        Deal deal = dealService.updateDeal(id, request, sellerId);
-        ProductDto product = catalogClient.getProduct(deal.getProductId()).orElse(null);
-        return DealResponse.from(deal, product);
+        return ResponseEntity.status(HttpStatus.OK).body(dealService.updateDeal(id, request, sellerId));
     }
 
     @GetMapping("/analytics")
@@ -55,33 +50,22 @@ public class DealController {
     }
 
     @GetMapping
-    public Page<DealResponse> listDeals(
+    public ResponseEntity<Page<DealResponse>> listDeals(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID sellerId,
             @RequestParam(required = false) UUID productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Page<Deal> deals = dealService.findAll(status, sellerId, productId, page, size);
-
-        Set<UUID> productIds = deals.getContent().stream()
-                .map(Deal::getProductId)
-                .collect(Collectors.toSet());
-        Map<UUID, ProductDto> products = catalogClient.getProducts(productIds);
-
-        return deals.map(deal -> DealResponse.from(deal, products));
+        return ResponseEntity.ok(dealService.findAll(status, sellerId, productId, page, size));
     }
 
     @GetMapping("/{id}")
-    public DealResponse getDeal(@PathVariable UUID id) {
-        Deal deal = dealService.getDeal(id);
-        ProductDto product = catalogClient.getProduct(deal.getProductId()).orElse(null);
-        return DealResponse.from(deal, product);
+    public ResponseEntity<DealResponse> getDeal(@PathVariable UUID id) {
+        return ResponseEntity.ok(dealService.getDeal(id));
     }
 
     @PostMapping("/{id}/cancel")
-    public DealResponse cancelDeal(@PathVariable UUID id, @RequestHeader("X-User-Id") UUID sellerId) {
-        Deal deal = dealService.cancelDeal(id, sellerId);
-        ProductDto product = catalogClient.getProduct(deal.getProductId()).orElse(null);
-        return DealResponse.from(deal, product);
+    public ResponseEntity<DealResponse> cancelDeal(@PathVariable UUID id, @RequestHeader("X-User-Id") UUID sellerId) {
+        return ResponseEntity.ok(dealService.cancelDeal(id, sellerId));
     }
 }

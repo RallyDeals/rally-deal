@@ -63,18 +63,6 @@ public class CatalogClientHttp implements CatalogClient {
         }
     }
 
-    @Override
-    public Map<UUID, ProductDto> getProducts(Collection<UUID> productIds) {
-        Map<UUID, ProductDto> map = new HashMap<>();
-        for (UUID pid : productIds) {
-            try {
-                getProduct(pid).ifPresent(dto -> map.put(pid, dto));
-            } catch (Exception e) {
-                log.warn("Failed to fetch product {}: {}", pid, e.getMessage());
-            }
-        }
-        return map;
-    }
 
     private ProductDto mapToProductDto(UUID productId, JsonNode json) {
         String name = json.has("name") ? json.get("name").asText(null) : null;

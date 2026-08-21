@@ -18,10 +18,4 @@ public class CatalogClientStub implements CatalogClient {
     public Optional<ProductDto> getProduct(UUID productId) {
         return Optional.of(new ProductDto(productId, STUB_SELLER_ID, new BigDecimal("199.99")));
     }
-
-    @Override
-    public Map<UUID, ProductDto> getProducts(Collection<UUID> productIds) {
-        return productIds.stream()
-                .collect(Collectors.toMap(id -> id, id -> new ProductDto(id, STUB_SELLER_ID, new BigDecimal("199.99"))));
-    }
 }

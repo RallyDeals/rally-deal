@@ -10,20 +10,17 @@ import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.domain.DealOutbox;
 import com.groupdeal.dealservice.domain.DealSlotRequest;
 import com.groupdeal.dealservice.domain.DealStatus;
+import com.groupdeal.dealservice.mapper.DealMapper;
+import com.groupdeal.dealservice.repository.DealOutboxRepository;
+import com.groupdeal.dealservice.repository.DealRepository;
+import com.groupdeal.dealservice.repository.DealSlotRequestRepository;
+import com.groupdeal.dealservice.web.dto.*;
 import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
 import com.rally.common.exceptions.domain.deal.DealCancellationNotAllowedException;
 import com.rally.common.exceptions.domain.deal.DealNotFoundException;
 import com.rally.common.exceptions.domain.deal.InvalidDealConfigurationException;
 import com.rally.common.exceptions.domain.inventory.InsufficientStockException;
 import com.rally.common.exceptions.shared.UnauthorizedException;
-import com.groupdeal.dealservice.repository.DealOutboxRepository;
-import com.groupdeal.dealservice.repository.DealRepository;
-import com.groupdeal.dealservice.repository.DealSlotRequestRepository;
-import com.groupdeal.dealservice.web.dto.CreateDealRequest;
-import com.groupdeal.dealservice.web.dto.DealAnalyticsResponse;
-import com.groupdeal.dealservice.web.dto.LeaveEligibilityResponse;
-import com.groupdeal.dealservice.web.dto.SlotResponse;
-import com.groupdeal.dealservice.web.dto.UpdateDealRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,7 +38,7 @@ import java.util.*;
 
 /**
  * Covers all user stories DS-01 through DS-13 from the design doc.
- *
+ * <p>
  * Every slot operation is idempotent (via deal_slot_requests dedup table)
  * and writes outbox events in the same transaction as the state change.
  */
@@ -56,11 +53,12 @@ public class DealService {
     private final CatalogClient catalogClient;
     private final InventoryClient inventoryClient;
     private final ObjectMapper objectMapper;
+    private final DealMapper dealMapper;
 
     // ── DS-01: Create deal (§5.1) ───────────────────────────────────────────────
 
     @Transactional
-    public Deal createDeal(CreateDealRequest request, UUID sellerId) {
+    public DealResponse createDeal(CreateDealRequest request, UUID sellerId) {
         if (request.minParticipants() > request.dealStock()) {
             throw new InvalidDealConfigurationException(
                     "min_participants (" + request.minParticipants() + ") cannot exceed deal_stock ("
@@ -101,14 +99,14 @@ public class DealService {
         // Outbox: deal.created (§6.3)
         writeOutbox(saved.getId(), "deal.created", buildDealCreatedPayload(saved));
 
-        return saved;
+        return dealMapper.toDealResponse(deal);
     }
 
     // ── DS-01b: Update deal (only while PENDING + no participants) ───────────────
 
     @Transactional
-    public Deal updateDeal(UUID dealId, UpdateDealRequest request, UUID sellerId) {
-        Deal deal = getDeal(dealId);
+    public DealResponse updateDeal(UUID dealId, UpdateDealRequest request, UUID sellerId) {
+        Deal deal = getDealById(dealId);
 
         if (!deal.getSellerId().equals(sellerId)) {
             throw new UnauthorizedException("You are not the seller of deal '" + dealId + "'");
@@ -133,14 +131,16 @@ public class DealService {
         deal.setMinParticipants(request.minParticipants());
         deal.setDurationMinutes(request.durationMinutes());
 
-        return dealRepository.save(deal);
+        Deal updatedDeal = dealRepository.save(deal);
+
+        return dealMapper.toDealResponse(updatedDeal);
     }
 
     // ── DS-02: Cancel deal (§5.3) ───────────────────────────────────────────────
 
     @Transactional
-    public Deal cancelDeal(UUID dealId, UUID sellerId) {
-        Deal deal = getDeal(dealId);
+    public DealResponse cancelDeal(UUID dealId, UUID sellerId) {
+        Deal deal = getDealById(dealId);
 
         if (!deal.getSellerId().equals(sellerId)) {
             throw new UnauthorizedException("You are not the seller of deal '" + dealId + "'");
@@ -156,15 +156,17 @@ public class DealService {
         // stock
         writeOutbox(saved.getId(), "deal.cancelled", buildDealCancelledPayload(saved));
 
-        return saved;
+        return dealMapper.toDealResponse(saved);
     }
 
     // ── DS-03: Get deal detail (§5.2) ───────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Deal getDeal(UUID dealId) {
-        return dealRepository.findById(dealId)
-                .orElseThrow(() -> new DealNotFoundException(dealId));
+    public DealResponse getDeal(UUID dealId) {
+        return dealMapper.toDealResponse(
+                dealRepository.findById(dealId)
+                        .orElseThrow(() -> new DealNotFoundException(dealId))
+        );
     }
 
     @Transactional(readOnly = true)
@@ -177,7 +179,7 @@ public class DealService {
     // ── DS-04 / DS-05: List deals with filtering (§4.1) ────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<Deal> findAll(String status, UUID sellerId, UUID productId, int page, int size) {
+    public Page<DealResponse> findAll(String status, UUID sellerId, UUID productId, int page, int size) {
         Specification<Deal> spec = Specification.where(null);
 
         if (status != null && !status.isBlank()) {
@@ -195,7 +197,7 @@ public class DealService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("productId"), productId));
         }
 
-        return dealRepository.findAll(spec, PageRequest.of(page, size));
+        return dealRepository.findAll(spec, PageRequest.of(page, size)).map(dealMapper::toDealResponse);
     }
 
     // ── DS-06: Reserve slot (§5.4) ──────────────────────────────────────────────
@@ -205,7 +207,7 @@ public class DealService {
         // Idempotency check
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
-            Deal deal = getDeal(dealId);
+            Deal deal = getDealById(dealId);
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
@@ -213,7 +215,7 @@ public class DealService {
             }
         }
 
-        Deal deal = getDeal(dealId);
+        Deal deal = getDealById(dealId);
 
         // Try first-join (pending→active) path
         if (deal.getStatus() == DealStatus.PENDING) {
@@ -222,7 +224,7 @@ public class DealService {
             int rows = dealRepository.reserveSlotFirstJoin(dealId, startTime, endTime);
             if (rows > 0) {
                 recordSlotRequest(requestId, dealId, "RESERVE", "SUCCESS");
-                Deal updated = getDeal(dealId);
+                Deal updated = getDealById(dealId);
                 // Outbox: deal.activated — catalog needs PENDING→ACTIVE transition
                 writeOutbox(updated.getId(), "deal.activated", buildDealActivatedPayload(updated));
                 return buildSlotSuccess(updated);
@@ -234,7 +236,7 @@ public class DealService {
             int rows = dealRepository.reserveSlotActive(dealId);
             if (rows > 0) {
                 recordSlotRequest(requestId, dealId, "RESERVE", "SUCCESS");
-                Deal updated = getDeal(dealId);
+                Deal updated = getDealById(dealId);
                 return buildSlotSuccess(updated);
             }
         }
@@ -257,7 +259,7 @@ public class DealService {
     public SlotResponse releaseSlot(UUID dealId, UUID requestId) {
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
-            Deal deal = getDeal(dealId);
+            Deal deal = getDealById(dealId);
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
@@ -265,7 +267,7 @@ public class DealService {
             }
         }
 
-        Deal deal = getDeal(dealId);
+        Deal deal = getDealById(dealId);
         if (deal.getCurrentParticipants() <= 0) {
             recordSlotRequest(requestId, dealId, "RELEASE", "REJECTED");
             return SlotResponse.rejected(dealId, "NO_SLOTS_TO_RELEASE");
@@ -274,7 +276,7 @@ public class DealService {
         int rows = dealRepository.releaseSlot(dealId);
         if (rows > 0) {
             recordSlotRequest(requestId, dealId, "RELEASE", "SUCCESS");
-            return buildSlotSuccess(getDeal(dealId));
+            return buildSlotSuccess(getDealById(dealId));
         }
 
         recordSlotRequest(requestId, dealId, "RELEASE", "REJECTED");
@@ -288,7 +290,7 @@ public class DealService {
     public SlotResponse authorizeSlot(UUID dealId, UUID requestId) {
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
-            Deal deal = getDeal(dealId);
+            Deal deal = getDealById(dealId);
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
@@ -296,7 +298,7 @@ public class DealService {
             }
         }
 
-        Deal deal = getDeal(dealId);
+        Deal deal = getDealById(dealId);
         if (deal.getAuthorizedCount() >= deal.getCurrentParticipants()) {
             recordSlotRequest(requestId, dealId, "AUTHORIZE", "REJECTED");
             return SlotResponse.rejected(dealId, "AUTHORIZED_COUNT_CAN'T_EXCEED_PARTICIPANTS");
@@ -308,7 +310,7 @@ public class DealService {
 
             // Check if this authorization fills all slots → succeed instantly (DS-08)
             int succeeded = dealRepository.succeedIfFullyAuthorized(dealId);
-            Deal updated = getDeal(dealId);
+            Deal updated = getDealById(dealId);
 
             if (succeeded > 0) {
                 log.info("Deal {} resolved as SUCCEEDED (stock filled via authorize-slot)", dealId);
@@ -330,7 +332,7 @@ public class DealService {
     public SlotResponse releaseAuthorizedSlot(UUID dealId, UUID requestId) {
         Optional<DealSlotRequest> existing = dealSlotRequestRepository.findByRequestId(requestId);
         if (existing.isPresent()) {
-            Deal deal = getDeal(dealId);
+            Deal deal = getDealById(dealId);
             if ("SUCCESS".equals(existing.get().getResult())) {
                 return buildSlotSuccess(deal);
             } else {
@@ -338,7 +340,7 @@ public class DealService {
             }
         }
 
-        Deal deal = getDeal(dealId);
+        Deal deal = getDealById(dealId);
         if (deal.getAuthorizedCount() <= 0) {
             recordSlotRequest(requestId, dealId, "RELEASE_AUTHORIZED", "REJECTED");
             return SlotResponse.rejected(dealId, "NO_AUTHORIZED_SLOTS_TO_RELEASE");
@@ -347,7 +349,7 @@ public class DealService {
         int rows = dealRepository.releaseAuthorizedSlot(dealId);
         if (rows > 0) {
             recordSlotRequest(requestId, dealId, "RELEASE_AUTHORIZED", "SUCCESS");
-            return buildSlotSuccess(getDeal(dealId));
+            return buildSlotSuccess(getDealById(dealId));
         }
 
         recordSlotRequest(requestId, dealId, "RELEASE_AUTHORIZED", "REJECTED");
@@ -359,7 +361,7 @@ public class DealService {
 
     @Transactional(readOnly = true)
     public LeaveEligibilityResponse checkLeaveEligible(UUID dealId) {
-        Deal deal = getDeal(dealId);
+        Deal deal = getDealById(dealId);
 
         if (deal.getStatus() != DealStatus.ACTIVE) {
             return LeaveEligibilityResponse.notEligible(dealId, "DEAL_NOT_ACTIVE");
@@ -385,7 +387,7 @@ public class DealService {
             if (deal.getAuthorizedCount() >= deal.getMinParticipants()) {
                 int rows = dealRepository.resolveExpiredAsSucceeded(deal.getId(), now);
                 if (rows > 0) {
-                    Deal updated = getDeal(deal.getId());
+                    Deal updated = getDealById(deal.getId());
                     log.info("Deal {} resolved as SUCCEEDED (timer expired, authorized_count={} >= min={})",
                             deal.getId(), updated.getAuthorizedCount(), updated.getMinParticipants());
                     writeOutbox(updated.getId(), "deal.succeeded",
@@ -394,7 +396,7 @@ public class DealService {
             } else {
                 int rows = dealRepository.resolveExpiredAsFailed(deal.getId(), now);
                 if (rows > 0) {
-                    Deal updated = getDeal(deal.getId());
+                    Deal updated = getDealById(deal.getId());
                     log.info("Deal {} resolved as FAILED (timer expired, authorized_count={} < min={})",
                             deal.getId(), updated.getAuthorizedCount(), updated.getMinParticipants());
                     writeOutbox(updated.getId(), "deal.failed",
@@ -466,6 +468,10 @@ public class DealService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize outbox payload for deal " + dealId, e);
         }
+    }
+
+    private Deal getDealById(UUID id){
+        return dealRepository.findById(id).orElseThrow(() -> new DealNotFoundException(id));
     }
 
     // ── Event payload builders (snake_case per §6.3) ────────────────────────────
