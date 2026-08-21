@@ -1,0 +1,7 @@
+# Override for integration tests — re-enable stubs so no real external services needed.
+groupdeal:
+  clients:
+    catalog:
+      stub: true
+    inventory:
+      stub: true
