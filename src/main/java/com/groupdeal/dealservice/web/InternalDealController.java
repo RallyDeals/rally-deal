@@ -3,9 +3,7 @@ package com.groupdeal.dealservice.web;
 import com.groupdeal.dealservice.service.DealService;
 import com.groupdeal.dealservice.web.dto.HasActiveDealsResponse;
 import com.groupdeal.dealservice.web.dto.LeaveEligibilityResponse;
-import com.groupdeal.dealservice.web.dto.SlotRequest;
 import com.groupdeal.dealservice.web.dto.SlotResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,8 +28,8 @@ public class InternalDealController {
      */
     @PostMapping("/{id}/reserve-slot")
     public SlotResponse reserveSlot(@PathVariable UUID id,
-                                    @Valid @RequestBody SlotRequest request) {
-        return dealService.reserveSlot(id, request.requestId());
+                                    @RequestHeader("requestId") UUID requestId) {
+        return dealService.reserveSlot(id, requestId);
     }
 
     /**
@@ -40,8 +38,8 @@ public class InternalDealController {
      */
     @PostMapping("/{id}/release-slot")
     public SlotResponse releaseSlot(@PathVariable UUID id,
-                                    @Valid @RequestBody SlotRequest request) {
-        return dealService.releaseSlot(id, request.requestId());
+                                    @RequestHeader("requestId") UUID requestId) {
+        return dealService.releaseSlot(id, requestId);
     }
 
     /**
@@ -51,8 +49,8 @@ public class InternalDealController {
      */
     @PostMapping("/{id}/authorize-slot")
     public SlotResponse authorizeSlot(@PathVariable UUID id,
-                                      @Valid @RequestBody SlotRequest request) {
-        return dealService.authorizeSlot(id, request.requestId());
+                                      @RequestHeader("requestId") UUID requestId) {
+        return dealService.authorizeSlot(id, requestId);
     }
 
     /**
@@ -62,8 +60,8 @@ public class InternalDealController {
      */
     @PostMapping("/{id}/release-authorized-slot")
     public SlotResponse releaseAuthorizedSlot(@PathVariable UUID id,
-                                              @Valid @RequestBody SlotRequest request) {
-        return dealService.releaseAuthorizedSlot(id, request.requestId());
+                                              @RequestHeader("requestId") UUID requestId) {
+        return dealService.releaseAuthorizedSlot(id, requestId);
     }
 
     /**
