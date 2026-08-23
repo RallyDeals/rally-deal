@@ -1,7 +1,6 @@
 package com.groupdeal.dealservice.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.groupdeal.dealservice.client.dto.ProductDto;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
@@ -23,13 +22,10 @@ import java.util.*;
 public class CatalogClientHttp implements CatalogClient {
 
     private final RestClient restClient;
-    private final ObjectMapper objectMapper;
 
     public CatalogClientHttp(
             RestClient.Builder restClientBuilder,
-            ObjectMapper objectMapper,
             @Value("${groupdeal.clients.catalog.base-url}") String baseUrl) {
-        this.objectMapper = objectMapper;
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();

@@ -1,13 +1,9 @@
 package com.groupdeal.dealservice.web.dto;
 
-import com.groupdeal.dealservice.client.dto.ProductDto;
-import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.domain.DealStatus;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 /**

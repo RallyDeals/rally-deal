@@ -19,12 +19,10 @@ public class InventoryClientStub implements InventoryClient {
 
     @Override
     public InventoryReservationResult reserve(UUID productId, Integer quantity) {
-        // TODO: replace with real HTTP call once Inventory Service exists.
         return new InventoryReservationResult(true, null);
     }
 
     @Override
     public void release(UUID productId, Integer quantity) {
-        // no-op stub
     }
 }

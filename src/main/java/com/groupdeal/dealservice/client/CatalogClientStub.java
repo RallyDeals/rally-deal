@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Component
 @ConditionalOnProperty(name = "groupdeal.clients.catalog.stub", havingValue = "true", matchIfMissing = true)

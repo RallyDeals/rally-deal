@@ -1,8 +1,5 @@
 package com.groupdeal.dealservice.web;
 
-import com.groupdeal.dealservice.client.CatalogClient;
-import com.groupdeal.dealservice.client.dto.ProductDto;
-import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.service.DealService;
 import com.groupdeal.dealservice.web.dto.CreateDealRequest;
 import com.groupdeal.dealservice.web.dto.DealAnalyticsResponse;
@@ -15,11 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/deals")
