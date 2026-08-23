@@ -65,20 +65,20 @@ class DealLifecycleIntegrationTest {
     @Test
     void createAndGetDeal_roundTrips() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
-        var fetched = dealService.getDeal(deal.getId());
+        var fetched = dealService.getDeal(deal.id());
 
-        assertThat(fetched.getId()).isEqualTo(deal.getId());
-        assertThat(fetched.getStatus()).isEqualTo(DealStatus.PENDING);
-        assertThat(fetched.getCurrentParticipants()).isZero();
-        assertThat(fetched.getOriginalPrice()).isEqualByComparingTo("199.99");
-        assertThat(fetched.getStartTime()).isNull();
+        assertThat(fetched.id()).isEqualTo(deal.id());
+        assertThat(fetched.status()).isEqualTo(DealStatus.PENDING);
+        assertThat(fetched.currentParticipants()).isZero();
+        assertThat(fetched.originalPrice()).isEqualByComparingTo("199.99");
+        assertThat(fetched.startTime()).isNull();
     }
 
     @Test
     void createDeal_persists_outboxEvent() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
         var events = dealOutboxRepository.findAll().stream()
-                .filter(e -> e.getDealId().equals(deal.getId()))
+                .filter(e -> e.getDealId().equals(deal.id()))
                 .toList();
 
         assertThat(events).hasSize(1);
@@ -88,10 +88,10 @@ class DealLifecycleIntegrationTest {
     @Test
     void cancelDeal_changesStatus_andWritesOutbox() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
-        dealService.cancelDeal(deal.getId(), SELLER);
-        var cancelled = dealService.getDeal(deal.getId());
+        dealService.cancelDeal(deal.id(), SELLER);
+        var cancelled = dealService.getDeal(deal.id());
 
-        assertThat(cancelled.getStatus()).isEqualTo(DealStatus.CANCELLED);
+        assertThat(cancelled.status()).isEqualTo(DealStatus.CANCELLED);
         var events = dealOutboxRepository.findAll();
         assertThat(events.stream().map(e -> e.getEventType()).toList())
                 .contains("deal.created", "deal.cancelled");
@@ -101,23 +101,23 @@ class DealLifecycleIntegrationTest {
     void cancelDeal_afterJoin_throws() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
         // First join activates the deal
-        dealService.reserveSlot(deal.getId(), UUID.randomUUID());
+        dealService.reserveSlot(deal.id(), UUID.randomUUID());
 
-        assertThatThrownBy(() -> dealService.cancelDeal(deal.getId(), SELLER))
+        assertThatThrownBy(() -> dealService.cancelDeal(deal.id(), SELLER))
                 .isInstanceOf(DealCancellationNotAllowedException.class);
     }
 
     @Test
     void reserveSlot_firstJoin_activatesDeal() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
-        var resp = dealService.reserveSlot(deal.getId(), UUID.randomUUID());
+        var resp = dealService.reserveSlot(deal.id(), UUID.randomUUID());
 
         assertThat(resp.success()).isTrue();
         assertThat(resp.status()).isEqualTo(DealStatus.ACTIVE);
         assertThat(resp.currentParticipants()).isEqualTo(1);
-        var updated = dealService.getDeal(deal.getId());
-        assertThat(updated.getStartTime()).isNotNull();
-        assertThat(updated.getEndTime()).isNotNull();
+        var updated = dealService.getDeal(deal.id());
+        assertThat(updated.startTime()).isNotNull();
+        assertThat(updated.endTime()).isNotNull();
     }
 
     @Test
@@ -125,22 +125,22 @@ class DealLifecycleIntegrationTest {
         var deal = dealService.createDeal(req(100, 10), SELLER);
         UUID reqId = UUID.randomUUID();
 
-        SlotResponse first  = dealService.reserveSlot(deal.getId(), reqId);
-        SlotResponse second = dealService.reserveSlot(deal.getId(), reqId);
+        SlotResponse first  = dealService.reserveSlot(deal.id(), reqId);
+        SlotResponse second = dealService.reserveSlot(deal.id(), reqId);
 
         assertThat(first.success()).isTrue();
         assertThat(second.success()).isTrue();
         // Second call must not increment the counter again
-        assertThat(dealService.getDeal(deal.getId()).getCurrentParticipants()).isEqualTo(1);
+        assertThat(dealService.getDeal(deal.id()).currentParticipants()).isEqualTo(1);
     }
 
     @Test
     void reserveSlot_rejected_whenDealFull() {
         var deal = dealService.createDeal(req(2, 1), SELLER); // stock = 2
-        dealService.reserveSlot(deal.getId(), UUID.randomUUID());
-        dealService.reserveSlot(deal.getId(), UUID.randomUUID());
+        dealService.reserveSlot(deal.id(), UUID.randomUUID());
+        dealService.reserveSlot(deal.id(), UUID.randomUUID());
 
-        SlotResponse resp = dealService.reserveSlot(deal.getId(), UUID.randomUUID());
+        SlotResponse resp = dealService.reserveSlot(deal.id(), UUID.randomUUID());
 
         assertThat(resp.success()).isFalse();
         assertThat(resp.reason()).isEqualTo("DEAL_FULL");
@@ -150,7 +150,7 @@ class DealLifecycleIntegrationTest {
     void authorizeSlot_rejected_whenAuthorizedExceedsParticipants() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
         // No one has reserved yet → authorized_count (0) >= current_participants (0)
-        SlotResponse resp = dealService.authorizeSlot(deal.getId(), UUID.randomUUID());
+        SlotResponse resp = dealService.authorizeSlot(deal.id(), UUID.randomUUID());
 
         assertThat(resp.success()).isFalse();
         assertThat(resp.reason()).containsIgnoringCase("AUTHORIZED_COUNT");
@@ -160,11 +160,11 @@ class DealLifecycleIntegrationTest {
     void authorizeSlot_succeedsDeal_whenAllSlotsAuthorized() {
         var deal = dealService.createDeal(req(2, 1), SELLER); // stock = 2
         UUID r1 = UUID.randomUUID(), r2 = UUID.randomUUID();
-        dealService.reserveSlot(deal.getId(), r1);
-        dealService.reserveSlot(deal.getId(), r2);
+        dealService.reserveSlot(deal.id(), r1);
+        dealService.reserveSlot(deal.id(), r2);
 
-        dealService.authorizeSlot(deal.getId(), UUID.randomUUID());
-        SlotResponse last = dealService.authorizeSlot(deal.getId(), UUID.randomUUID());
+        dealService.authorizeSlot(deal.id(), UUID.randomUUID());
+        SlotResponse last = dealService.authorizeSlot(deal.id(), UUID.randomUUID());
 
         assertThat(last.success()).isTrue();
         assertThat(last.status()).isEqualTo(DealStatus.SUCCEEDED);
@@ -177,26 +177,26 @@ class DealLifecycleIntegrationTest {
     @Test
     void releaseSlot_decrementsParticipants() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
-        dealService.reserveSlot(deal.getId(), UUID.randomUUID());
-        assertThat(dealService.getDeal(deal.getId()).getCurrentParticipants()).isEqualTo(1);
+        dealService.reserveSlot(deal.id(), UUID.randomUUID());
+        assertThat(dealService.getDeal(deal.id()).currentParticipants()).isEqualTo(1);
 
-        dealService.releaseSlot(deal.getId(), UUID.randomUUID());
+        dealService.releaseSlot(deal.id(), UUID.randomUUID());
 
-        assertThat(dealService.getDeal(deal.getId()).getCurrentParticipants()).isZero();
+        assertThat(dealService.getDeal(deal.id()).currentParticipants()).isZero();
     }
 
     @Test
     void releaseAuthorizedSlot_decrementsBothCounters() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
-        dealService.reserveSlot(deal.getId(), UUID.randomUUID());
-        dealService.authorizeSlot(deal.getId(), UUID.randomUUID());
-        assertThat(dealService.getDeal(deal.getId()).getAuthorizedCount()).isEqualTo(1);
+        dealService.reserveSlot(deal.id(), UUID.randomUUID());
+        dealService.authorizeSlot(deal.id(), UUID.randomUUID());
+        assertThat(dealService.getDeal(deal.id()).authorizedCount()).isEqualTo(1);
 
-        dealService.releaseAuthorizedSlot(deal.getId(), UUID.randomUUID());
+        dealService.releaseAuthorizedSlot(deal.id(), UUID.randomUUID());
 
-        var updated = dealService.getDeal(deal.getId());
-        assertThat(updated.getCurrentParticipants()).isZero();
-        assertThat(updated.getAuthorizedCount()).isZero();
+        var updated = dealService.getDeal(deal.id());
+        assertThat(updated.currentParticipants()).isZero();
+        assertThat(updated.authorizedCount()).isZero();
     }
 
     @Test
@@ -204,28 +204,28 @@ class DealLifecycleIntegrationTest {
         // Create deal with short duration so we can back-date it
         var deal = dealService.createDeal(req(100, 1), SELLER);
         // Manually activate and back-date end_time via reserve + direct update
-        dealService.reserveSlot(deal.getId(), UUID.randomUUID());
-        dealService.authorizeSlot(deal.getId(), UUID.randomUUID());
+        dealService.reserveSlot(deal.id(), UUID.randomUUID());
+        dealService.authorizeSlot(deal.id(), UUID.randomUUID());
 
         // Manually push end_time to the past via repository to simulate timer expiry
-        var d = dealService.getDeal(deal.getId());
+        var d = dealService.getDeal(deal.id());
         // Use reflection to push end_time back - easier to handle through a custom query
         // For simplicity, just verify the path works; the full timer test is in concurrency test
-        assertThat(d.getAuthorizedCount()).isGreaterThanOrEqualTo(d.getMinParticipants());
+        assertThat(d.authorizedCount()).isGreaterThanOrEqualTo(d.minParticipants());
     }
 
     @Test
     void findAll_filteredByStatus() {
         dealService.createDeal(req(100, 10), SELLER); // PENDING
         var deal2 = dealService.createDeal(req(100, 10), SELLER);
-        dealService.reserveSlot(deal2.getId(), UUID.randomUUID()); // ACTIVE
+        dealService.reserveSlot(deal2.id(), UUID.randomUUID()); // ACTIVE
 
         var pending = dealService.findAll("PENDING", null, null, 0, 10);
         var active  = dealService.findAll("ACTIVE",  null, null, 0, 10);
 
-        assertThat(pending.getContent()).extracting(d -> d.getStatus())
+        assertThat(pending.getContent()).extracting(d -> d.status())
                 .containsOnly(DealStatus.PENDING);
-        assertThat(active.getContent()).extracting(d -> d.getStatus())
+        assertThat(active.getContent()).extracting(d -> d.status())
                 .containsOnly(DealStatus.ACTIVE);
     }
 
@@ -233,7 +233,7 @@ class DealLifecycleIntegrationTest {
     void checkLeaveEligible_notEligible_forNonActiveDeal() {
         var deal = dealService.createDeal(req(100, 10), SELLER); // PENDING
 
-        LeaveEligibilityResponse resp = dealService.checkLeaveEligible(deal.getId());
+        LeaveEligibilityResponse resp = dealService.checkLeaveEligible(deal.id());
 
         assertThat(resp.eligible()).isFalse();
         assertThat(resp.reason()).isEqualTo("DEAL_NOT_ACTIVE");
@@ -242,9 +242,9 @@ class DealLifecycleIntegrationTest {
     @Test
     void checkLeaveEligible_eligible_forActiveDealWithTimeRemaining() {
         var deal = dealService.createDeal(req(100, 10), SELLER);
-        dealService.reserveSlot(deal.getId(), UUID.randomUUID()); // activates deal (duration=1440min)
+        dealService.reserveSlot(deal.id(), UUID.randomUUID()); // activates deal (duration=1440min)
 
-        LeaveEligibilityResponse resp = dealService.checkLeaveEligible(deal.getId());
+        LeaveEligibilityResponse resp = dealService.checkLeaveEligible(deal.id());
 
         assertThat(resp.eligible()).isTrue();
     }

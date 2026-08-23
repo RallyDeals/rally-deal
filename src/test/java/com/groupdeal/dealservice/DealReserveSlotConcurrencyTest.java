@@ -76,7 +76,7 @@ class DealReserveSlotConcurrencyTest {
         try {
             for (int i = 0; i < THREADS; i++) {
                 UUID requestId = UUID.randomUUID();
-                futures.add(pool.submit(() -> dealService.reserveSlot(deal.getId(), requestId)));
+                futures.add(pool.submit(() -> dealService.reserveSlot(deal.id(), requestId)));
             }
 
             List<SlotResponse> responses = new ArrayList<>();
@@ -91,8 +91,8 @@ class DealReserveSlotConcurrencyTest {
             assertThat(rejections).isEqualTo(THREADS - STOCK);
 
             // The DB counter must also match — never exceeded stock
-            var finalDeal = dealService.getDeal(deal.getId());
-            assertThat(finalDeal.getCurrentParticipants()).isEqualTo(STOCK);
+            var finalDeal = dealService.getDeal(deal.id());
+            assertThat(finalDeal.currentParticipants()).isEqualTo(STOCK);
         } finally {
             pool.shutdown();
         }

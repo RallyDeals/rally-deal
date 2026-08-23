@@ -7,10 +7,12 @@ import com.groupdeal.dealservice.client.dto.InventoryReservationResult;
 import com.groupdeal.dealservice.client.dto.ProductDto;
 import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.domain.DealStatus;
+import com.groupdeal.dealservice.mapper.DealMapper;
 import com.groupdeal.dealservice.repository.DealOutboxRepository;
 import com.groupdeal.dealservice.repository.DealRepository;
 import com.groupdeal.dealservice.repository.DealSlotRequestRepository;
 import com.groupdeal.dealservice.web.dto.CreateDealRequest;
+import com.groupdeal.dealservice.web.dto.DealResponse;
 import com.groupdeal.dealservice.web.dto.LeaveEligibilityResponse;
 import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
 import com.rally.common.exceptions.domain.deal.DealCancellationNotAllowedException;
@@ -42,6 +44,7 @@ class DealServiceTest {
     @Mock private DealSlotRequestRepository dealSlotRequestRepository;
     @Mock private CatalogClient catalogClient;
     @Mock private InventoryClient inventoryClient;
+    @Mock private DealMapper dealMapper;
 
     private DealService dealService;
 
@@ -55,7 +58,7 @@ class DealServiceTest {
         dealService = new DealService(
                 dealRepository, dealOutboxRepository,
                 dealSlotRequestRepository, catalogClient,
-                inventoryClient, new ObjectMapper());
+                inventoryClient, new ObjectMapper(), dealMapper);
     }
 
     // ── createDeal ───────────────────────────────────────────────────────────────
@@ -134,11 +137,17 @@ class DealServiceTest {
         saved.setAuthorizedCount(0);
         when(dealRepository.save(any())).thenReturn(saved);
 
-        CreateDealRequest req = new CreateDealRequest(PRODUCT_ID, DEAL_PRICE, 100, 10, 1440);
-        Deal result = dealService.createDeal(req, SELLER_ID);
+        DealResponse mappedResponse = new DealResponse(
+                UUID.randomUUID(), PRODUCT_ID, SELLER_ID,
+                BASE_PRICE, DEAL_PRICE, 100, 0, 0, 10,
+                DealStatus.PENDING, null, 1440, null, null, null);
+        when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
 
-        assertThat(result.getStatus()).isEqualTo(DealStatus.PENDING);
-        assertThat(result.getCurrentParticipants()).isZero();
+        CreateDealRequest req = new CreateDealRequest(PRODUCT_ID, DEAL_PRICE, 100, 10, 1440);
+        DealResponse result = dealService.createDeal(req, SELLER_ID);
+
+        assertThat(result.status()).isEqualTo(DealStatus.PENDING);
+        assertThat(result.currentParticipants()).isZero();
         verify(dealOutboxRepository).save(argThat(e -> "deal.created".equals(e.getEventType())));
     }
 
@@ -170,9 +179,15 @@ class DealServiceTest {
         when(dealRepository.findById(deal.getId())).thenReturn(Optional.of(deal));
         when(dealRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Deal result = dealService.cancelDeal(deal.getId(), SELLER_ID);
+        DealResponse mappedResponse = new DealResponse(
+                deal.getId(), PRODUCT_ID, SELLER_ID,
+                BASE_PRICE, DEAL_PRICE, 100, 0, 0, 10,
+                DealStatus.CANCELLED, null, 1440, null, null, null);
+        when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
 
-        assertThat(result.getStatus()).isEqualTo(DealStatus.CANCELLED);
+        DealResponse result = dealService.cancelDeal(deal.getId(), SELLER_ID);
+
+        assertThat(result.status()).isEqualTo(DealStatus.CANCELLED);
         verify(dealOutboxRepository).save(argThat(e -> "deal.cancelled".equals(e.getEventType())));
     }
 
