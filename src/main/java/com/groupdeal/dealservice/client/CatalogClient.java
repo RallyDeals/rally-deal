@@ -2,6 +2,8 @@ package com.groupdeal.dealservice.client;
 
 import com.groupdeal.dealservice.client.dto.ProductDto;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 

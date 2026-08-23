@@ -1,4 +1,4 @@
-# Override for integration tests — re-enable stubs so no real external services needed.
+# Test profile overrides — re-enable stubs for tests so external HTTP services aren't required during build.
 groupdeal:
   clients:
     catalog:

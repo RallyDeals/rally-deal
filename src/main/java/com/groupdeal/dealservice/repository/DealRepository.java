@@ -145,4 +145,20 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
               AND authorized_count < min_participants
             """, nativeQuery = true)
     int resolveExpiredAsFailed(@Param("dealId") UUID dealId, @Param("now") OffsetDateTime now);
+
+    // ── Analytics queries ───────────────────────────────────────────────────────
+
+    long countBySellerId(UUID sellerId);
+
+    long countBySellerIdAndStatus(UUID sellerId, DealStatus status);
+
+    long countBySellerIdAndCreatedAtBetween(UUID sellerId, OffsetDateTime from, OffsetDateTime to);
+
+    long countBySellerIdAndStatusIn(UUID sellerId, Collection<DealStatus> statuses);
+
+    long countByStatus(DealStatus status);
+
+    long countByCreatedAtBetween(OffsetDateTime from, OffsetDateTime to);
+
+    long countByStatusIn(Collection<DealStatus> statuses);
 }

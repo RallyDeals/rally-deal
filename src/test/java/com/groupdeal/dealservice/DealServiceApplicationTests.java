@@ -1,9 +1,9 @@
 package com.groupdeal.dealservice;
 
-import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.domain.DealStatus;
 import com.groupdeal.dealservice.service.DealService;
 import com.groupdeal.dealservice.web.dto.CreateDealRequest;
+import com.groupdeal.dealservice.web.dto.DealResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,13 +65,13 @@ class DealServiceApplicationTests {
                 1440
         );
 
-        Deal deal = dealService.createDeal(request, CatalogClientStub.STUB_SELLER_ID);
+        DealResponse deal = dealService.createDeal(request, CatalogClientStub.STUB_SELLER_ID);
 
-        assertThat(deal.getId()).isNotNull();
-        assertThat(deal.getStatus()).isEqualTo(DealStatus.PENDING);
-        assertThat(deal.getCurrentParticipants()).isZero();
-        assertThat(deal.getOriginalPrice()).isEqualByComparingTo("199.99"); // from CatalogClientStub
-        assertThat(deal.getStartTime()).isNull();
-        assertThat(deal.getEndTime()).isNull();
+        assertThat(deal.id()).isNotNull();
+        assertThat(deal.status()).isEqualTo(DealStatus.PENDING);
+        assertThat(deal.currentParticipants()).isZero();
+        assertThat(deal.originalPrice()).isEqualByComparingTo("199.99"); // from CatalogClientStub
+        assertThat(deal.startTime()).isNull();
+        assertThat(deal.endTime()).isNull();
     }
 }

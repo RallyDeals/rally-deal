@@ -1,0 +1,19 @@
+package com.groupdeal.dealservice.web.dto;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
+import java.math.BigDecimal;
+
+/**
+ * Request body for PATCH /deals/{id}.
+ * Only updatable while the deal is PENDING and has zero participants.
+ */
+public record UpdateDealRequest(
+        @NotNull @DecimalMin(value = "0.01") BigDecimal dealPrice,
+        @NotNull @Min(1) Integer dealStock,
+        @NotNull @Min(1) Integer minParticipants,
+        @NotNull @Min(1) Integer durationMinutes
+) {
+}

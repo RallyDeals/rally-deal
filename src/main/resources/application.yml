@@ -41,10 +41,11 @@ groupdeal:
     catalog:
       # Override per-env with GROUPDEAL_CLIENTS_CATALOG_STUB=true to fall back to the stub.
       stub: false           # active real HTTP client
-      base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+      base-url: ${CATALOG_SERVICE_URL:http://localhost:8083}
     inventory:
-      stub: true            # flip to false once Inventory Service exists (see InventoryClient)
-      base-url: ${INVENTORY_SERVICE_URL:http://localhost:8083}
+      # Override per-env with GROUPDEAL_CLIENTS_INVENTORY_STUB=true to fall back to the stub.
+      stub: false           # active real HTTP client
+      base-url: ${INVENTORY_SERVICE_URL:http://localhost:8087}
 
 resilience4j:
   circuitbreaker:
