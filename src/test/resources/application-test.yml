@@ -1,0 +1,7 @@
+# Test profile overrides — re-enable stubs for tests so external HTTP services aren't required during build.
+groupdeal:
+  clients:
+    catalog:
+      stub: true
+    inventory:
+      stub: true
