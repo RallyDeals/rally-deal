@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DealServiceApplicationTests {
 
     @Container
+    @SuppressWarnings("resource")
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("groupdeal_deals")
             .withUsername("groupdeal")
