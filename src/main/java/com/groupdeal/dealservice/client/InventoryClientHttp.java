@@ -45,7 +45,7 @@ public class InventoryClientHttp implements InventoryClient {
     public InventoryReservationResult reserve(UUID productId, Integer quantity) {
         try {
             JsonNode json = restClient.post()
-                    .uri("/inventory/{productId}/reserve", productId)
+                    .uri("/inventory/{productId}/reserve-deal", productId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("quantity", quantity))
                     .retrieve()
@@ -71,7 +71,7 @@ public class InventoryClientHttp implements InventoryClient {
     public void release(UUID productId, Integer quantity) {
         try {
             restClient.post()
-                    .uri("/inventory/{productId}/release", productId)
+                    .uri("/inventory/{productId}/release-deal", productId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("quantity", quantity))
                     .retrieve()
@@ -84,13 +84,12 @@ public class InventoryClientHttp implements InventoryClient {
 
     @SuppressWarnings("unused")
     private InventoryReservationResult reserveFallback(UUID productId, Integer quantity, Throwable t) {
-        log.error("Inventory Service unavailable while reserving stock for product {} (circuit open or request failed)", productId, t);
-        throw new IllegalStateException("Inventory Service unavailable while reserving stock for product " + productId, t);
+        log.error("Inventory service unavailable while reserving stock for product {} (quantity={}): {}", productId, quantity, t.getMessage());
+        return new InventoryReservationResult(false, "INVENTORY_SERVICE_UNAVAILABLE");
     }
 
     @SuppressWarnings("unused")
     private void releaseFallback(UUID productId, Integer quantity, Throwable t) {
-        log.error("Inventory Service unavailable while releasing stock for product {} (circuit open or request failed)", productId, t);
-        throw new IllegalStateException("Inventory Service unavailable while releasing stock for product " + productId, t);
+        log.error("Inventory service unavailable while releasing stock for product {} (quantity={}): {}", productId, quantity, t.getMessage());
     }
 }
