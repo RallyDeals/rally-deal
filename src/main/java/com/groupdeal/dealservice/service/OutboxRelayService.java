@@ -47,7 +47,7 @@ public class OutboxRelayService {
             try {
                 // Key by deal_id so Kafka guarantees ordering per deal
                 ProducerRecord<String, String> record = new ProducerRecord<>(
-                        "deal-events", entry.getDealId().toString(), entry.getPayload());
+                        TOPIC, entry.getDealId().toString(), entry.getPayload());
                 record.headers()
                         .add(new RecordHeader("X-Id", entry.getId().toString().getBytes(StandardCharsets.UTF_8)))
                         .add(new RecordHeader("X-Type", entry.getEventType().getBytes(StandardCharsets.UTF_8)))
