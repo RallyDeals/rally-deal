@@ -522,9 +522,9 @@ public class DealService {
 
     private Map<String, Object> buildDealCancelledPayload(Deal deal) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("deal_id", deal.getId());
-        payload.put("product_id", deal.getProductId());
-        payload.put("deal_stock", deal.getDealStock());
+        payload.put("dealId", deal.getId());
+        payload.put("authorizedCount", deal.getAuthorizedCount());
+        payload.put("dealStock", deal.getDealStock());
         return payload;
     }
 
