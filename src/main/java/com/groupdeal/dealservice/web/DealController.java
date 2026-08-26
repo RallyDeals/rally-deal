@@ -1,13 +1,7 @@
 package com.groupdeal.dealservice.web;
 
-import com.groupdeal.dealservice.client.CatalogClient;
-import com.groupdeal.dealservice.client.dto.ProductDto;
-import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.service.DealService;
-import com.groupdeal.dealservice.web.dto.CreateDealRequest;
-import com.groupdeal.dealservice.web.dto.DealAnalyticsResponse;
-import com.groupdeal.dealservice.web.dto.DealResponse;
-import com.groupdeal.dealservice.web.dto.UpdateDealRequest;
+import com.groupdeal.dealservice.web.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -67,5 +61,10 @@ public class DealController {
     @PostMapping("/{id}/cancel")
     public ResponseEntity<DealResponse> cancelDeal(@PathVariable UUID id, @RequestHeader("X-User-Id") UUID sellerId) {
         return ResponseEntity.ok(dealService.cancelDeal(id, sellerId));
+    }
+
+    @PostMapping("/bulk")
+    public ResponseEntity<List<DealResponse>> getDealsBulk(@RequestBody BulkDealRequest request) {
+        return ResponseEntity.ok(dealService.findAllByIdsAndStatus(request.ids(), request.statuses()));
     }
 }

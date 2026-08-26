@@ -170,6 +170,17 @@ public class DealService {
     }
 
     @Transactional(readOnly = true)
+    public List<DealResponse> findAllByIdsAndStatus(List<UUID> ids, List<DealStatus> status) {
+        List<Deal> deals = (status == null || status.isEmpty())
+                ? dealRepository.findAllById(ids)
+                : dealRepository.findDealsByIdAndStatusIn(ids, status);
+
+        return deals.stream()
+                .map(dealMapper::toDealResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public boolean hasActiveDeals(UUID productId) {
         return dealRepository.existsByProductIdAndStatusIn(
                 productId,
