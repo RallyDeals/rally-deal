@@ -140,7 +140,7 @@ class DealServiceTest {
         DealResponse mappedResponse = new DealResponse(
                 UUID.randomUUID(), PRODUCT_ID, SELLER_ID,
                 BASE_PRICE, DEAL_PRICE, 100, 0, 0, 10,
-                DealStatus.PENDING, null, 1440, null, null, null);
+                DealStatus.PENDING, null, 1440, null, null);
         when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
 
         CreateDealRequest req = new CreateDealRequest(PRODUCT_ID, DEAL_PRICE, 100, 10, 1440);
@@ -182,7 +182,7 @@ class DealServiceTest {
         DealResponse mappedResponse = new DealResponse(
                 deal.getId(), PRODUCT_ID, SELLER_ID,
                 BASE_PRICE, DEAL_PRICE, 100, 0, 0, 10,
-                DealStatus.CANCELLED, null, 1440, null, null, null);
+                DealStatus.CANCELLED, null, 1440, null, null);
         when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
 
         DealResponse result = dealService.cancelDeal(deal.getId(), SELLER_ID);
