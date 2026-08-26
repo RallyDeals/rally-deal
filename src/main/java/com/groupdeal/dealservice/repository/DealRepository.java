@@ -146,6 +146,12 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
             """, nativeQuery = true)
     int resolveExpiredAsFailed(@Param("dealId") UUID dealId, @Param("now") OffsetDateTime now);
 
+
+    @Query("""
+            SELECT d FROM Deal d
+             WHERE d.id IN :dealIds AND d.status IN :statuses""")
+    List<Deal> findDealsByIdAndStatusIn(List<UUID> dealIds, List<DealStatus> statuses);
+
     // ── Analytics queries ───────────────────────────────────────────────────────
 
     long countBySellerId(UUID sellerId);

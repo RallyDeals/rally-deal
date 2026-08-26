@@ -25,6 +25,5 @@ public record DealResponse(
         OffsetDateTime startTime,
         Integer durationMinutes,
         OffsetDateTime endTime,
-        Long timeRemainingSeconds,
         OffsetDateTime createdAt
 ) { }
