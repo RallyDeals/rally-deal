@@ -4,13 +4,17 @@ import com.groupdeal.dealservice.domain.DealOutbox;
 import com.groupdeal.dealservice.repository.DealOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Transactional outbox relay (design doc §3 / §6.3).
@@ -42,7 +46,13 @@ public class OutboxRelayService {
         for (DealOutbox entry : pending) {
             try {
                 // Key by deal_id so Kafka guarantees ordering per deal
-                kafkaTemplate.send(TOPIC, String.valueOf(entry.getDealId()), entry.getPayload());
+                ProducerRecord<String, String> record = new ProducerRecord<>(
+                        "deal-events", entry.getDealId().toString(), entry.getPayload());
+                record.headers()
+                        .add(new RecordHeader("X-Id", entry.getId().toString().getBytes(StandardCharsets.UTF_8)))
+                        .add(new RecordHeader("X-Type", entry.getEventType().getBytes(StandardCharsets.UTF_8)))
+                        .add(new RecordHeader("X-Correlation-Id", (UUID.randomUUID()).toString().getBytes(StandardCharsets.UTF_8)));
+                kafkaTemplate.send(record);
                 entry.setPublishedAt(OffsetDateTime.now());
                 dealOutboxRepository.save(entry);
                 log.debug("Published outbox entry {} (type={}, dealId={})",

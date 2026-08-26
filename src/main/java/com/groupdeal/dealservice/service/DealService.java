@@ -325,7 +325,7 @@ public class DealService {
 
             if (succeeded > 0) {
                 log.info("Deal {} resolved as SUCCEEDED (stock filled via authorize-slot)", dealId);
-                writeOutbox(updated.getId(), "deal.succeeded",
+                writeOutbox(updated.getId(), "Deal.Succeeded",
                         buildDealResolvedPayload(updated, "STOCK_FILLED"));
             }
 
@@ -522,9 +522,6 @@ public class DealService {
 
     private Map<String, Object> buildDealCancelledPayload(Deal deal) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("event_id", UUID.randomUUID().toString());
-        payload.put("event_type", "deal.cancelled");
-        payload.put("occurred_at", OffsetDateTime.now().toString());
         payload.put("deal_id", deal.getId());
         payload.put("product_id", deal.getProductId());
         payload.put("deal_stock", deal.getDealStock());
@@ -533,39 +530,17 @@ public class DealService {
 
     private Map<String, Object> buildDealResolvedPayload(Deal deal, String resolvedTrigger) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("event_id", UUID.randomUUID().toString());
-        payload.put("event_type", "deal.succeeded");
-        payload.put("occurred_at", OffsetDateTime.now().toString());
-        payload.put("deal_id", deal.getId());
-        payload.put("product_id", deal.getProductId());
-        payload.put("seller_id", deal.getSellerId());
-        payload.put("original_price", deal.getOriginalPrice());
-        payload.put("deal_price", deal.getDealPrice());
-        payload.put("current_participants", deal.getCurrentParticipants());
-        payload.put("authorized_count", deal.getAuthorizedCount());
-        payload.put("deal_stock", deal.getDealStock());
-        payload.put("min_participants", deal.getMinParticipants());
-        payload.put("start_time", deal.getStartTime() != null ? deal.getStartTime().toString() : null);
-        payload.put("end_time", deal.getEndTime() != null ? deal.getEndTime().toString() : null);
-        payload.put("resolved_trigger", resolvedTrigger);
+        payload.put("dealId", deal.getId());
+        payload.put("authorizedCount", deal.getAuthorizedCount());
+        payload.put("dealStock", deal.getDealStock());
         return payload;
     }
 
     private Map<String, Object> buildDealFailedPayload(Deal deal) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("event_id", UUID.randomUUID().toString());
-        payload.put("event_type", "deal.failed");
-        payload.put("occurred_at", OffsetDateTime.now().toString());
-        payload.put("deal_id", deal.getId());
-        payload.put("product_id", deal.getProductId());
-        payload.put("seller_id", deal.getSellerId());
-        payload.put("current_participants", deal.getCurrentParticipants());
-        payload.put("authorized_count", deal.getAuthorizedCount());
-        payload.put("deal_stock", deal.getDealStock());
-        payload.put("min_participants", deal.getMinParticipants());
-        payload.put("start_time", deal.getStartTime() != null ? deal.getStartTime().toString() : null);
-        payload.put("end_time", deal.getEndTime() != null ? deal.getEndTime().toString() : null);
-        payload.put("resolved_trigger", "TIMER_EXPIRED_BELOW_MIN");
+        payload.put("dealId", deal.getId());
+        payload.put("authorizedCount", deal.getAuthorizedCount());
+        payload.put("dealStock", deal.getDealStock());
         return payload;
     }
 }
