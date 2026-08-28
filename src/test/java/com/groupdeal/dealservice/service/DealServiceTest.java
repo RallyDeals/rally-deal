@@ -50,6 +50,7 @@ class DealServiceTest {
 
     private static final UUID SELLER_ID   = UUID.randomUUID();
     private static final UUID PRODUCT_ID  = UUID.randomUUID();
+    private static final UUID CATEGORY_ID = UUID.randomUUID();
     private static final BigDecimal BASE_PRICE = new BigDecimal("199.99");
     private static final BigDecimal DEAL_PRICE = new BigDecimal("149.99");
 
@@ -138,7 +139,7 @@ class DealServiceTest {
         when(dealRepository.save(any())).thenReturn(saved);
 
         DealResponse mappedResponse = new DealResponse(
-                UUID.randomUUID(), PRODUCT_ID, SELLER_ID,
+                UUID.randomUUID(), PRODUCT_ID, CATEGORY_ID, SELLER_ID,
                 BASE_PRICE, DEAL_PRICE, 100, 0, 0, 10,
                 DealStatus.PENDING, null, 1440, null, null);
         when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
@@ -180,7 +181,7 @@ class DealServiceTest {
         when(dealRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DealResponse mappedResponse = new DealResponse(
-                deal.getId(), PRODUCT_ID, SELLER_ID,
+                deal.getId(), PRODUCT_ID, CATEGORY_ID, SELLER_ID,
                 BASE_PRICE, DEAL_PRICE, 100, 0, 0, 10,
                 DealStatus.CANCELLED, null, 1440, null, null);
         when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
@@ -238,6 +239,17 @@ class DealServiceTest {
         LeaveEligibilityResponse result = dealService.checkLeaveEligible(deal.getId());
 
         assertThat(result.eligible()).isTrue();
+    }
+
+    @Test
+    void findAll_filteredByCategoryId() {
+        org.springframework.data.domain.PageImpl<Deal> page = new org.springframework.data.domain.PageImpl<>(java.util.List.of());
+        when(dealRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(page);
+
+        dealService.findAll(null, null, null, CATEGORY_ID, 0, 10);
+
+        verify(dealRepository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────

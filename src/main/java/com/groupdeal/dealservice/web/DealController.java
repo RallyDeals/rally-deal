@@ -45,9 +45,10 @@ public class DealController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID sellerId,
             @RequestParam(required = false) UUID productId,
+            @RequestParam(required = false) UUID categoryId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(dealService.findAll(status, sellerId, productId, page, size));
+        return ResponseEntity.ok(dealService.findAll(status, sellerId, productId, categoryId, page, size));
     }
 
     @GetMapping("/{id}")

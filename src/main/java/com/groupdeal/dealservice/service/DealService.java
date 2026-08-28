@@ -84,6 +84,8 @@ public class DealService {
 
         Deal deal = new Deal();
         deal.setProductId(request.productId());
+        UUID categoryId = request.categoryId() != null ? request.categoryId() : product.categoryId();
+        deal.setCategoryId(categoryId);
         deal.setSellerId(sellerId);
         deal.setOriginalPrice(product.basePrice());
         deal.setDealPrice(request.dealPrice());
@@ -190,6 +192,11 @@ public class DealService {
 
     @Transactional(readOnly = true)
     public Page<DealResponse> findAll(String status, UUID sellerId, UUID productId, int page, int size) {
+        return findAll(status, sellerId, productId, null, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DealResponse> findAll(String status, UUID sellerId, UUID productId, UUID categoryId, int page, int size) {
         Specification<Deal> spec = Specification.where(null);
 
         if (status != null && !status.isBlank()) {
@@ -205,6 +212,9 @@ public class DealService {
         }
         if (productId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("productId"), productId));
+        }
+        if (categoryId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("categoryId"), categoryId));
         }
 
         return dealRepository.findAll(spec, PageRequest.of(page, size)).map(dealMapper::toDealResponse);
@@ -493,6 +503,7 @@ public class DealService {
         payload.put("occurredAt", OffsetDateTime.now().toString());
         payload.put("dealId", deal.getId());
         payload.put("productId", deal.getProductId());
+        payload.put("categoryId", deal.getCategoryId());
         payload.put("sellerId", deal.getSellerId());
         payload.put("originalPrice", deal.getOriginalPrice());
         payload.put("dealPrice", deal.getDealPrice());
@@ -509,6 +520,7 @@ public class DealService {
         payload.put("occurredAt", OffsetDateTime.now().toString());
         payload.put("dealId", deal.getId());
         payload.put("productId", deal.getProductId());
+        payload.put("categoryId", deal.getCategoryId());
         payload.put("dealPrice", deal.getDealPrice());
         payload.put("dealStock", deal.getDealStock());
         payload.put("currentParticipants", deal.getCurrentParticipants());

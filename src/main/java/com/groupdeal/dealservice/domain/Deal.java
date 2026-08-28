@@ -32,6 +32,9 @@ public class Deal {
     @Column(name = "product_id", nullable = false, columnDefinition = "uuid")
     private UUID productId;
 
+    @Column(name = "category_id", columnDefinition = "uuid")
+    private UUID categoryId;
+
     @Column(name = "seller_id", nullable = false, columnDefinition = "uuid")
     private UUID sellerId;
 

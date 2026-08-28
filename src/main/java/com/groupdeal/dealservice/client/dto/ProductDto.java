@@ -14,10 +14,15 @@ public record ProductDto(
         String name,
         String imageUrl,
         String category,
+        UUID categoryId,
         String sku,
         String sellerName
 ) {
     public ProductDto(UUID productId, UUID sellerId, BigDecimal basePrice) {
-        this(productId, sellerId, basePrice, null, null, null, null, null);
+        this(productId, sellerId, basePrice, null, null, null, null, null, null);
+    }
+
+    public ProductDto(UUID productId, UUID sellerId, BigDecimal basePrice, UUID categoryId) {
+        this(productId, sellerId, basePrice, null, null, null, categoryId, null, null);
     }
 }

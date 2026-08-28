@@ -64,9 +64,26 @@ public class CatalogClientHttp implements CatalogClient {
         String name = json.has("name") ? json.get("name").asText(null) : null;
         String imageUrl = json.has("imageUrl") ? json.get("imageUrl").asText(null) : null;
         String category = null;
+        UUID categoryId = null;
+
+        if (json.has("categoryId") && json.get("categoryId") != null && !json.get("categoryId").isNull()) {
+            try {
+                categoryId = UUID.fromString(json.get("categoryId").asText());
+            } catch (IllegalArgumentException ignored) {}
+        }
+
         if (json.has("category") && json.get("category") != null && !json.get("category").isNull()) {
             JsonNode cat = json.get("category");
-            category = cat.has("name") ? cat.get("name").asText(null) : null;
+            if (cat.isObject()) {
+                category = cat.has("name") ? cat.get("name").asText(null) : null;
+                if (categoryId == null && cat.has("id") && !cat.get("id").isNull()) {
+                    try {
+                        categoryId = UUID.fromString(cat.get("id").asText());
+                    } catch (IllegalArgumentException ignored) {}
+                }
+            } else if (cat.isTextual()) {
+                category = cat.asText();
+            }
         }
         String sku = json.has("sku") ? json.get("sku").asText(null) : null;
         String sellerIdStr = json.has("sellerId") ? json.get("sellerId").asText(null) : null;
@@ -74,7 +91,7 @@ public class CatalogClientHttp implements CatalogClient {
         String sellerName = json.has("sellerName") ? json.get("sellerName").asText(null) : null;
         BigDecimal basePrice = json.has("basePrice") ? json.get("basePrice").decimalValue() : null;
 
-        return new ProductDto(productId, sellerId, basePrice, name, imageUrl, category, sku, sellerName);
+        return new ProductDto(productId, sellerId, basePrice, name, imageUrl, category, categoryId, sku, sellerName);
     }
 
     @SuppressWarnings("unused")

@@ -70,6 +70,7 @@ CREATE TYPE deal_status AS ENUM ('pending', 'active', 'succeeded', 'failed', 'ca
 CREATE TABLE deals (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id            UUID NOT NULL,
+    category_id           UUID,
     seller_id             UUID NOT NULL,
 
     original_price        NUMERIC(10,2) NOT NULL CHECK (original_price > 0), -- snapshot of product.base_price from Catalog Service at creation time; never updated afterward, even if the seller edits the product later
@@ -97,6 +98,8 @@ CREATE TABLE deals (
 CREATE INDEX idx_deals_status            ON deals (status);
 CREATE INDEX idx_deals_seller_id         ON deals (seller_id, status);
 CREATE INDEX idx_deals_product_id        ON deals (product_id);
+CREATE INDEX idx_deals_category_id       ON deals (category_id);
+CREATE INDEX idx_deals_category_status   ON deals (category_id, status);
 -- Powers the internal timer sweep (§6):
 CREATE INDEX idx_deals_active_end_time   ON deals (end_time) WHERE status = 'active';
 ```
@@ -140,7 +143,7 @@ CREATE TABLE deal_slot_requests (
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | POST | `/deals` | Seller | Create a deal on a product the caller owns |
-| GET | `/deals` | Any | Browse/filter deals — query params: `status`, `sellerId`, `productId`, `page`, `size` |
+| GET | `/deals` | Any | Browse/filter deals — query params: `status`, `sellerId`, `productId`, `categoryId`, `page`, `size` |
 | GET | `/deals/{id}` | Any | Deal detail, including live progress (`currentParticipants`/`dealStock`, `timeRemainingSeconds`) |
 | POST | `/deals/{id}/cancel` | Seller (owner) | Cancel — only legal while `pending` |
 
@@ -169,6 +172,7 @@ Request:
 ```json
 {
   "productId": "8a2c1f0e-...",
+  "categoryId": "5f3a2b1c-...",
   "dealPrice": 149.99,
   "dealStock": 100,
   "minParticipants": 40,
@@ -185,6 +189,7 @@ Response `201 Created`:
 {
   "id": "9e1c4b7a-...",
   "productId": "8a2c1f0e-...",
+  "categoryId": "5f3a2b1c-...",
   "sellerId": "331f2a90-...",
   "originalPrice": 199.99,
   "dealPrice": 149.99,
@@ -212,6 +217,7 @@ couldn't reserve the requested `dealStock`).
 {
   "id": "9e1c4b7a-...",
   "productId": "8a2c1f0e-...",
+  "categoryId": "5f3a2b1c-...",
   "sellerId": "331f2a90-...",
   "originalPrice": 199.99,
   "dealPrice": 149.99,

@@ -14,6 +14,7 @@ import java.util.UUID;
 public record DealResponse(
         UUID id,
         UUID productId,
+        UUID categoryId,
         UUID sellerId,
         BigDecimal originalPrice,
         BigDecimal dealPrice,

@@ -60,6 +60,10 @@ class DealLifecycleIntegrationTest {
         return new CreateDealRequest(UUID.randomUUID(), PRICE, stock, min, 1440);
     }
 
+    private CreateDealRequest req(int stock, int min, UUID categoryId) {
+        return new CreateDealRequest(UUID.randomUUID(), categoryId, PRICE, stock, min, 1440);
+    }
+
     // ── Tests ──────────────────────────────────────────────────────────────────
 
     @Test
@@ -227,6 +231,24 @@ class DealLifecycleIntegrationTest {
                 .containsOnly(DealStatus.PENDING);
         assertThat(active.getContent()).extracting(d -> d.status())
                 .containsOnly(DealStatus.ACTIVE);
+    }
+
+    @Test
+    void findAll_filteredByCategoryId() {
+        UUID cat1 = UUID.randomUUID();
+        UUID cat2 = UUID.randomUUID();
+
+        var deal1 = dealService.createDeal(req(100, 10, cat1), SELLER);
+        var deal2 = dealService.createDeal(req(100, 10, cat2), SELLER);
+
+        var pageCat1 = dealService.findAll(null, null, null, cat1, 0, 10);
+        var pageCat2 = dealService.findAll(null, null, null, cat2, 0, 10);
+
+        assertThat(pageCat1.getContent()).extracting(d -> d.id()).contains(deal1.id()).doesNotContain(deal2.id());
+        assertThat(pageCat1.getContent()).extracting(d -> d.categoryId()).containsOnly(cat1);
+
+        assertThat(pageCat2.getContent()).extracting(d -> d.id()).contains(deal2.id()).doesNotContain(deal1.id());
+        assertThat(pageCat2.getContent()).extracting(d -> d.categoryId()).containsOnly(cat2);
     }
 
     @Test
