@@ -79,7 +79,7 @@ public class DealService {
 
         InventoryReservationResult reservation = inventoryClient.reserve(request.productId(), request.dealStock());
         if (!reservation.success()) {
-            throw new InsufficientStockException(request.productId(), request.dealStock(), 0);
+            throw new InsufficientStockException(request.productId(), request.dealStock(), 0); // TODO: change the hard-coded 0
         }
 
         Deal deal = new Deal();
@@ -114,12 +114,12 @@ public class DealService {
             throw new UnauthorizedException("You are not the seller of deal '" + dealId + "'");
         }
         if (deal.getStatus() != DealStatus.PENDING) {
-            throw new DealCancellationNotAllowedException(dealId);
+            throw new DealCancellationNotAllowedException(dealId); // TODO: change exception type
         }
         if (deal.getCurrentParticipants() > 0) {
             throw new InvalidDealConfigurationException(
                     "Cannot update deal '" + dealId + "' — " + deal.getCurrentParticipants()
-                            + " participant(s) already joined. You must cancel this deal and create a new one.");
+                            + " participant(s) already joined. You must cancel this deal and create a new one."); // TODO: change exception msg
         }
 
         if (request.minParticipants() > request.dealStock()) {
