@@ -128,8 +128,39 @@ public class DealService {
                             + request.dealStock() + ")");
         }
 
+        ProductDto product = catalogClient.getProduct(deal.getProductId())
+                .orElseThrow(() -> new ProductNotFoundException(deal.getProductId()));
+
+        if (!product.sellerId().equals(sellerId)) {
+            throw new UnauthorizedException("You are not the owner of product '" + deal.getProductId() + "'");
+        }
+
+        if (request.dealPrice().compareTo(product.basePrice()) >= 0) {
+            throw new InvalidDealConfigurationException(
+                    "deal_price must be strictly less than the product's base_price (" + product.basePrice() + ")");
+        }
+
+        int oldStock = deal.getDealStock();
+        int newStock = request.dealStock();
+
+        if (newStock > oldStock) {
+            int delta = newStock - oldStock;
+            InventoryReservationResult reservation = inventoryClient.reserve(deal.getProductId(), delta);
+            if (!reservation.success()) {
+                throw new InsufficientStockException(deal.getProductId(), delta, 0);
+            }
+        } else if (newStock < oldStock) {
+            int delta = oldStock - newStock;
+            inventoryClient.release(deal.getProductId(), delta);
+        }
+
+        deal.setOriginalPrice(product.basePrice());
+        if (product.categoryId() != null) {
+            deal.setCategoryId(product.categoryId());
+        }
+
         deal.setDealPrice(request.dealPrice());
-        deal.setDealStock(request.dealStock());
+        deal.setDealStock(newStock);
         deal.setMinParticipants(request.minParticipants());
         deal.setDurationMinutes(request.durationMinutes());
 

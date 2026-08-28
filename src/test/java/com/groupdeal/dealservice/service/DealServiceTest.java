@@ -152,6 +152,71 @@ class DealServiceTest {
         verify(dealOutboxRepository).save(argThat(e -> "Deal.Created".equals(e.getEventType())));
     }
 
+    // ── updateDeal ───────────────────────────────────────────────────────────────
+
+    @Test
+    void updateDeal_success_reservesStockDeltaWhenIncreased() {
+        Deal deal = pendingDeal(); // dealStock = 100
+        when(dealRepository.findById(deal.getId())).thenReturn(Optional.of(deal));
+        when(catalogClient.getProduct(PRODUCT_ID))
+                .thenReturn(Optional.of(new ProductDto(PRODUCT_ID, SELLER_ID, BASE_PRICE, CATEGORY_ID)));
+        when(inventoryClient.reserve(PRODUCT_ID, 50))
+                .thenReturn(new InventoryReservationResult(true, null));
+        when(dealRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        DealResponse mappedResponse = new DealResponse(
+                deal.getId(), PRODUCT_ID, CATEGORY_ID, SELLER_ID,
+                BASE_PRICE, new BigDecimal("129.99"), 150, 0, 0, 10,
+                DealStatus.PENDING, null, 1440, null, null);
+        when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
+
+        com.groupdeal.dealservice.web.dto.UpdateDealRequest req =
+                new com.groupdeal.dealservice.web.dto.UpdateDealRequest(new BigDecimal("129.99"), 150, 10, 1440);
+
+        DealResponse result = dealService.updateDeal(deal.getId(), req, SELLER_ID);
+
+        assertThat(result.dealStock()).isEqualTo(150);
+        verify(inventoryClient).reserve(PRODUCT_ID, 50);
+    }
+
+    @Test
+    void updateDeal_success_releasesStockDeltaWhenDecreased() {
+        Deal deal = pendingDeal(); // dealStock = 100
+        when(dealRepository.findById(deal.getId())).thenReturn(Optional.of(deal));
+        when(catalogClient.getProduct(PRODUCT_ID))
+                .thenReturn(Optional.of(new ProductDto(PRODUCT_ID, SELLER_ID, BASE_PRICE, CATEGORY_ID)));
+        when(dealRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        DealResponse mappedResponse = new DealResponse(
+                deal.getId(), PRODUCT_ID, CATEGORY_ID, SELLER_ID,
+                BASE_PRICE, new BigDecimal("129.99"), 80, 0, 0, 10,
+                DealStatus.PENDING, null, 1440, null, null);
+        when(dealMapper.toDealResponse(any(Deal.class))).thenReturn(mappedResponse);
+
+        com.groupdeal.dealservice.web.dto.UpdateDealRequest req =
+                new com.groupdeal.dealservice.web.dto.UpdateDealRequest(new BigDecimal("129.99"), 80, 10, 1440);
+
+        DealResponse result = dealService.updateDeal(deal.getId(), req, SELLER_ID);
+
+        assertThat(result.dealStock()).isEqualTo(80);
+        verify(inventoryClient).release(PRODUCT_ID, 20);
+    }
+
+    @Test
+    void updateDeal_throwsWhen_dealPriceNotLessThanBasePrice() {
+        Deal deal = pendingDeal();
+        when(dealRepository.findById(deal.getId())).thenReturn(Optional.of(deal));
+        when(catalogClient.getProduct(PRODUCT_ID))
+                .thenReturn(Optional.of(new ProductDto(PRODUCT_ID, SELLER_ID, BASE_PRICE, CATEGORY_ID)));
+
+        com.groupdeal.dealservice.web.dto.UpdateDealRequest req =
+                new com.groupdeal.dealservice.web.dto.UpdateDealRequest(BASE_PRICE, 100, 10, 1440);
+
+        assertThatThrownBy(() -> dealService.updateDeal(deal.getId(), req, SELLER_ID))
+                .isInstanceOf(InvalidDealConfigurationException.class)
+                .hasMessageContaining("base_price");
+    }
+
     // ── cancelDeal ───────────────────────────────────────────────────────────────
 
     @Test
