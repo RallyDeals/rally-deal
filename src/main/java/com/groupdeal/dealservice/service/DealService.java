@@ -96,8 +96,8 @@ public class DealService {
 
         Deal saved = dealRepository.save(deal);
 
-        // Outbox: deal.created (§6.3)
-        writeOutbox(saved.getId(), "deal.created", buildDealCreatedPayload(saved));
+        // Outbox: Deal.Created (§6.3)
+        writeOutbox(saved.getId(), "Deal.Created", buildDealCreatedPayload(saved));
 
         return dealMapper.toDealResponse(deal);
     }
@@ -152,9 +152,8 @@ public class DealService {
         deal.setStatus(DealStatus.CANCELLED);
         Deal saved = dealRepository.save(deal);
 
-        // Outbox: deal.cancelled (§6.3) — Inventory Service needs to release reserved
-        // stock
-        writeOutbox(saved.getId(), "deal.cancelled", buildDealCancelledPayload(saved));
+        // Outbox: Deal.Cancelled (§6.3) — Inventory Service needs to release reserved stock
+        writeOutbox(saved.getId(), "Deal.Cancelled", buildDealCancelledPayload(saved));
 
         return dealMapper.toDealResponse(saved);
     }
@@ -236,8 +235,8 @@ public class DealService {
             if (rows > 0) {
                 recordSlotRequest(requestId, dealId, "RESERVE", "SUCCESS");
                 Deal updated = getDealById(dealId);
-                // Outbox: deal.activated — catalog needs PENDING→ACTIVE transition
-                writeOutbox(updated.getId(), "deal.activated", buildDealActivatedPayload(updated));
+                // Outbox: Deal.Activated — catalog needs PENDING→ACTIVE transition
+                writeOutbox(updated.getId(), "Deal.Activated", buildDealActivatedPayload(updated));
                 return buildSlotSuccess(updated);
             }
         }
@@ -401,7 +400,7 @@ public class DealService {
                     Deal updated = getDealById(deal.getId());
                     log.info("Deal {} resolved as SUCCEEDED (timer expired, authorized_count={} >= min={})",
                             deal.getId(), updated.getAuthorizedCount(), updated.getMinParticipants());
-                    writeOutbox(updated.getId(), "deal.succeeded",
+                    writeOutbox(updated.getId(), "Deal.Succeeded",
                             buildDealResolvedPayload(updated, "TIMER_EXPIRED"));
                 }
             } else {
@@ -410,7 +409,7 @@ public class DealService {
                     Deal updated = getDealById(deal.getId());
                     log.info("Deal {} resolved as FAILED (timer expired, authorized_count={} < min={})",
                             deal.getId(), updated.getAuthorizedCount(), updated.getMinParticipants());
-                    writeOutbox(updated.getId(), "deal.failed",
+                    writeOutbox(updated.getId(), "Deal.Failed",
                             buildDealFailedPayload(updated));
                 }
             }
@@ -485,62 +484,77 @@ public class DealService {
         return dealRepository.findById(id).orElseThrow(() -> new DealNotFoundException(id));
     }
 
-    // ── Event payload builders (snake_case per §6.3) ────────────────────────────
+    // ── Event payload builders ──────────────────────────────────────────────────
 
     private Map<String, Object> buildDealCreatedPayload(Deal deal) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("event_id", UUID.randomUUID().toString());
-        payload.put("event_type", "deal.created");
-        payload.put("occurred_at", OffsetDateTime.now().toString());
-        payload.put("deal_id", deal.getId());
-        payload.put("product_id", deal.getProductId());
-        payload.put("seller_id", deal.getSellerId());
-        payload.put("original_price", deal.getOriginalPrice());
-        payload.put("deal_price", deal.getDealPrice());
-        payload.put("deal_stock", deal.getDealStock());
-        payload.put("min_participants", deal.getMinParticipants());
-        payload.put("duration_minutes", deal.getDurationMinutes());
+        // payload.put("eventId", UUID.randomUUID().toString()); // in header
+        // payload.put("eventType", "Deal.Created"); // in header
+        payload.put("occurredAt", OffsetDateTime.now().toString());
+        payload.put("dealId", deal.getId());
+        payload.put("productId", deal.getProductId());
+        payload.put("sellerId", deal.getSellerId());
+        payload.put("originalPrice", deal.getOriginalPrice());
+        payload.put("dealPrice", deal.getDealPrice());
+        payload.put("dealStock", deal.getDealStock());
+        payload.put("minParticipants", deal.getMinParticipants());
+        payload.put("durationMinutes", deal.getDurationMinutes());
         return payload;
     }
 
     private Map<String, Object> buildDealActivatedPayload(Deal deal) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("event_id", UUID.randomUUID().toString());
-        payload.put("event_type", "deal.activated");
-        payload.put("occurred_at", OffsetDateTime.now().toString());
-        payload.put("deal_id", deal.getId());
-        payload.put("product_id", deal.getProductId());
-        payload.put("deal_price", deal.getDealPrice());
-        payload.put("deal_stock", deal.getDealStock());
-        payload.put("current_participants", deal.getCurrentParticipants());
-        payload.put("min_participants", deal.getMinParticipants());
-        payload.put("duration_minutes", deal.getDurationMinutes());
-        payload.put("start_time", deal.getStartTime() != null ? deal.getStartTime().toString() : null);
-        payload.put("end_time", deal.getEndTime() != null ? deal.getEndTime().toString() : null);
+        // payload.put("eventId", UUID.randomUUID().toString()); // in header
+        // payload.put("eventType", "Deal.Activated"); // in header
+        payload.put("occurredAt", OffsetDateTime.now().toString());
+        payload.put("dealId", deal.getId());
+        payload.put("productId", deal.getProductId());
+        payload.put("dealPrice", deal.getDealPrice());
+        payload.put("dealStock", deal.getDealStock());
+        payload.put("currentParticipants", deal.getCurrentParticipants());
+        payload.put("minParticipants", deal.getMinParticipants());
+        payload.put("durationMinutes", deal.getDurationMinutes());
+        payload.put("startTime", deal.getStartTime() != null ? deal.getStartTime().toString() : null);
+        payload.put("endTime", deal.getEndTime() != null ? deal.getEndTime().toString() : null);
         return payload;
     }
 
     private Map<String, Object> buildDealCancelledPayload(Deal deal) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        // payload.put("eventId", UUID.randomUUID().toString()); // in header
+        // payload.put("eventType", "Deal.Cancelled"); // in header
+        payload.put("occurredAt", OffsetDateTime.now().toString());
         payload.put("dealId", deal.getId());
+        payload.put("productId", deal.getProductId());
+        payload.put("reservedStock", deal.getDealStock());
         payload.put("authorizedCount", deal.getAuthorizedCount());
-        payload.put("dealStock", deal.getDealStock());
+        payload.put("quantity", deal.getDealStock()); // needed for inventory service
         return payload;
     }
 
     private Map<String, Object> buildDealResolvedPayload(Deal deal, String resolvedTrigger) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        // payload.put("eventId", UUID.randomUUID().toString()); // in header
+        // payload.put("eventType", "Deal.Succeeded"); // in header
+        payload.put("occurredAt", OffsetDateTime.now().toString());
         payload.put("dealId", deal.getId());
+        payload.put("reservedStock", deal.getDealStock());
         payload.put("authorizedCount", deal.getAuthorizedCount());
-        payload.put("dealStock", deal.getDealStock());
+        payload.put("productId", deal.getProductId());
+        payload.put("quantity", deal.getDealStock() - deal.getAuthorizedCount()); // needed for inventory service
         return payload;
     }
 
     private Map<String, Object> buildDealFailedPayload(Deal deal) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        // payload.put("eventId", UUID.randomUUID().toString()); // in header
+        // payload.put("eventType", "Deal.Failed"); // in header
+        payload.put("occurredAt", OffsetDateTime.now().toString());
         payload.put("dealId", deal.getId());
+        payload.put("reservedStock", deal.getDealStock());
         payload.put("authorizedCount", deal.getAuthorizedCount());
-        payload.put("dealStock", deal.getDealStock());
+        payload.put("productId", deal.getProductId());
+        payload.put("quantity", deal.getDealStock()); // needed for inventory service
         return payload;
     }
 }

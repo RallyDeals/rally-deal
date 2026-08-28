@@ -30,10 +30,15 @@ import java.util.UUID;
 @Slf4j
 public class OutboxRelayService {
 
-    private static final String TOPIC = "deal-events";
-
     private final DealOutboxRepository dealOutboxRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
+
+    private static String resolveTopic(String eventType) {
+        if (eventType != null && (eventType.startsWith("deal.") || eventType.startsWith("Deal."))) {
+            return "deal";
+        }
+        return "deal-events";
+    }
 
     @Scheduled(fixedRate = 2000)
     @Transactional
@@ -47,11 +52,14 @@ public class OutboxRelayService {
             try {
                 // Key by deal_id so Kafka guarantees ordering per deal
                 ProducerRecord<String, String> record = new ProducerRecord<>(
-                        TOPIC, entry.getDealId().toString(), entry.getPayload());
+                        resolveTopic(entry.getEventType()), entry.getDealId().toString(), entry.getPayload());
+                UUID correlationId = UUID.randomUUID();
                 record.headers()
                         .add(new RecordHeader("X-Id", entry.getId().toString().getBytes(StandardCharsets.UTF_8)))
                         .add(new RecordHeader("X-Type", entry.getEventType().getBytes(StandardCharsets.UTF_8)))
-                        .add(new RecordHeader("X-Correlation-Id", (UUID.randomUUID()).toString().getBytes(StandardCharsets.UTF_8)));
+                        .add(new RecordHeader("X-Correlation-Id", correlationId.toString().getBytes(StandardCharsets.UTF_8)))
+                        .add(new RecordHeader("X-Causation-Id", entry.getId().toString().getBytes(StandardCharsets.UTF_8)))
+                        .add(new RecordHeader("X-Trace-Id", correlationId.toString().getBytes(StandardCharsets.UTF_8)));
                 kafkaTemplate.send(record);
                 entry.setPublishedAt(OffsetDateTime.now());
                 dealOutboxRepository.save(entry);

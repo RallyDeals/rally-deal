@@ -82,7 +82,7 @@ class DealLifecycleIntegrationTest {
                 .toList();
 
         assertThat(events).hasSize(1);
-        assertThat(events.get(0).getEventType()).isEqualTo("deal.created");
+        assertThat(events.get(0).getEventType()).isEqualTo("Deal.Created");
     }
 
     @Test
@@ -94,7 +94,7 @@ class DealLifecycleIntegrationTest {
         assertThat(cancelled.status()).isEqualTo(DealStatus.CANCELLED);
         var events = dealOutboxRepository.findAll();
         assertThat(events.stream().map(e -> e.getEventType()).toList())
-                .contains("deal.created", "deal.cancelled");
+                .contains("Deal.Created", "Deal.Cancelled");
     }
 
     @Test
@@ -171,7 +171,7 @@ class DealLifecycleIntegrationTest {
 
         var events = dealOutboxRepository.findAll().stream()
                 .map(e -> e.getEventType()).toList();
-        assertThat(events).contains("deal.succeeded");
+        assertThat(events).contains("Deal.Succeeded");
     }
 
     @Test

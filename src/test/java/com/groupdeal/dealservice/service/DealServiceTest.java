@@ -148,7 +148,7 @@ class DealServiceTest {
 
         assertThat(result.status()).isEqualTo(DealStatus.PENDING);
         assertThat(result.currentParticipants()).isZero();
-        verify(dealOutboxRepository).save(argThat(e -> "deal.created".equals(e.getEventType())));
+        verify(dealOutboxRepository).save(argThat(e -> "Deal.Created".equals(e.getEventType())));
     }
 
     // ── cancelDeal ───────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ class DealServiceTest {
         DealResponse result = dealService.cancelDeal(deal.getId(), SELLER_ID);
 
         assertThat(result.status()).isEqualTo(DealStatus.CANCELLED);
-        verify(dealOutboxRepository).save(argThat(e -> "deal.cancelled".equals(e.getEventType())));
+        verify(dealOutboxRepository).save(argThat(e -> "Deal.Cancelled".equals(e.getEventType())));
     }
 
     // ── getDeal ──────────────────────────────────────────────────────────────────
