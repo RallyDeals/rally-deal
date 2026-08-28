@@ -179,6 +179,7 @@ public class DealService {
             throw new UnauthorizedException("You are not the seller of deal '" + dealId + "'");
         }
         if (deal.getStatus() != DealStatus.PENDING) {
+            // TODO: Consider idempotency here — if status is already CANCELLED from a retried request, return success (200) instead of throwing DealCancellationNotAllowedException
             throw new DealCancellationNotAllowedException(dealId);
         }
 
