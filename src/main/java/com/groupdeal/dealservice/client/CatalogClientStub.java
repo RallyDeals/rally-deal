@@ -15,6 +15,7 @@ public class CatalogClientStub implements CatalogClient {
 
     @Override
     public Optional<ProductDto> getProduct(UUID productId) {
-        return Optional.of(new ProductDto(productId, STUB_SELLER_ID, new BigDecimal("199.99")));
+        UUID categoryId = UUID.nameUUIDFromBytes(("category-" + productId).getBytes());
+        return Optional.of(new ProductDto(productId, STUB_SELLER_ID, new BigDecimal("199.99"), categoryId));
     }
 }

@@ -84,8 +84,7 @@ public class DealService {
 
         Deal deal = new Deal();
         deal.setProductId(request.productId());
-        UUID categoryId = request.categoryId() != null ? request.categoryId() : product.categoryId();
-        deal.setCategoryId(categoryId);
+        deal.setCategoryId(product.categoryId());
         deal.setSellerId(sellerId);
         deal.setOriginalPrice(product.basePrice());
         deal.setDealPrice(request.dealPrice());

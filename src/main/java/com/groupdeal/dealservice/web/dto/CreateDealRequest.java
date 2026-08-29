@@ -14,13 +14,9 @@ import java.util.UUID;
  */
 public record CreateDealRequest(
         @NotNull UUID productId,
-        UUID categoryId,
         @NotNull @DecimalMin(value = "0.01") BigDecimal dealPrice,
         @NotNull @Min(1) Integer dealStock,
         @NotNull @Min(1) Integer minParticipants,
         @NotNull @Min(1) Integer durationMinutes
 ) {
-    public CreateDealRequest(UUID productId, BigDecimal dealPrice, Integer dealStock, Integer minParticipants, Integer durationMinutes) {
-        this(productId, null, dealPrice, dealStock, minParticipants, durationMinutes);
-    }
 }
