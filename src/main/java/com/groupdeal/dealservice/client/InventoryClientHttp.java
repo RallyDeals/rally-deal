@@ -9,7 +9,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
@@ -17,6 +16,14 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * HTTP implementation of InventoryClient.
+ *
+ * The inventory service now returns a structured JSON body
+ * {@code { "success": bool, "reason": str|null, "availableStock": int|null }}
+ * for both reserve-deal and reserve-order endpoints — always HTTP 200.
+ * No exception-catching needed; we just deserialize and map.
+ */
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "groupdeal.clients.inventory.stub", havingValue = "false")
@@ -43,27 +50,28 @@ public class InventoryClientHttp implements InventoryClient {
     @Override
     @CircuitBreaker(name = "inventoryService", fallbackMethod = "reserveFallback")
     public InventoryReservationResult reserve(UUID productId, Integer quantity) {
-        try {
-            JsonNode json = restClient.post()
-                    .uri("/inventory/{productId}/reserve-deal", productId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("quantity", quantity))
-                    .retrieve()
-                    .body(JsonNode.class);
+        JsonNode json = restClient.post()
+                .uri("/inventory/{productId}/reserve-deal", productId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("quantity", quantity))
+                .retrieve()
+                .body(JsonNode.class);
 
-            if (json != null && json.has("success")) {
-                boolean success = json.get("success").asBoolean(false);
-                String reason = json.has("reason") && !json.get("reason").isNull()
-                        ? json.get("reason").asText()
-                        : null;
-                return new InventoryReservationResult(success, reason);
-            }
-
-            return new InventoryReservationResult(true, null);
-        } catch (HttpClientErrorException.BadRequest e) {
-            log.info("Inventory Service returned 400 Bad Request reserving stock for product {}", productId);
-            return new InventoryReservationResult(false, "INSUFFICIENT_STOCK");
+        if (json == null || !json.has("success")) {
+            // Unexpected empty body — treat as success (backward-compat with old inventory deployments)
+            log.warn("Inventory Service returned unexpected body for product {} reservation; assuming success", productId);
+            return new InventoryReservationResult(true, null, null);
         }
+
+        boolean success = json.get("success").asBoolean(false);
+        String reason = json.has("reason") && !json.get("reason").isNull()
+                ? json.get("reason").asText()
+                : null;
+        Integer availableStock = json.has("availableStock") && !json.get("availableStock").isNull()
+                ? json.get("availableStock").asInt()
+                : null;
+
+        return new InventoryReservationResult(success, reason, availableStock);
     }
 
     @Override
@@ -85,7 +93,7 @@ public class InventoryClientHttp implements InventoryClient {
     @SuppressWarnings("unused")
     private InventoryReservationResult reserveFallback(UUID productId, Integer quantity, Throwable t) {
         log.error("Inventory service unavailable while reserving stock for product {} (quantity={}): {}", productId, quantity, t.getMessage());
-        return new InventoryReservationResult(false, "INVENTORY_SERVICE_UNAVAILABLE");
+        return new InventoryReservationResult(false, "INVENTORY_SERVICE_UNAVAILABLE", null);
     }
 
     @SuppressWarnings("unused")

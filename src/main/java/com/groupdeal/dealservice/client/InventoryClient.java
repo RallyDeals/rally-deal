@@ -8,7 +8,10 @@ import java.util.UUID;
  * Sync dependency on Inventory Service (design doc §6.2).
  * Two implementations wired via `groupdeal.clients.inventory.stub` (application.yml):
  *   - InventoryClientStub  (default — Inventory Service doesn't exist yet)
- *   - InventoryClientHttp  (real WebClient call, ready for when it does)
+ *   - InventoryClientHttp  (real HTTP call to rally-inventory)
+ *
+ * The reserve() call always returns a structured result; callers should never
+ * need to make a separate GET to look up available stock.
  */
 public interface InventoryClient {
 

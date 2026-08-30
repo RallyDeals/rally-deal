@@ -6,6 +6,10 @@ package com.groupdeal.dealservice.client.dto;
  */
 public record InventoryReservationResult(
         boolean success,
-        String reason // populated only when success = false, e.g. "INSUFFICIENT_STOCK"
+        String reason, // populated only when success = false, e.g. "INSUFFICIENT_STOCK"
+        Integer availableStock
 ) {
+    public InventoryReservationResult(boolean success, String reason) {
+        this(success, reason, null);
+    }
 }

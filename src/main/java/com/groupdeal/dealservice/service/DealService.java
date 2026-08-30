@@ -79,7 +79,8 @@ public class DealService {
 
         InventoryReservationResult reservation = inventoryClient.reserve(request.productId(), request.dealStock());
         if (!reservation.success()) {
-            throw new InsufficientStockException(request.productId(), request.dealStock(), 0); // TODO: change the hard-coded 0
+            int available = reservation.availableStock() != null ? reservation.availableStock() : 0;
+            throw new InsufficientStockException(request.productId(), request.dealStock(), available);
         }
 
         Deal deal = new Deal();
@@ -143,7 +144,8 @@ public class DealService {
             int delta = newStock - oldStock;
             InventoryReservationResult reservation = inventoryClient.reserve(deal.getProductId(), delta);
             if (!reservation.success()) {
-                throw new InsufficientStockException(deal.getProductId(), delta, 0);
+                int available = reservation.availableStock() != null ? reservation.availableStock() : 0;
+                throw new InsufficientStockException(deal.getProductId(), delta, available);
             }
         } else if (newStock < oldStock) {
             int delta = oldStock - newStock;

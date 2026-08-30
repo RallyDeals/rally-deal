@@ -111,11 +111,12 @@ class DealServiceTest {
         when(catalogClient.getProduct(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductDto(PRODUCT_ID, SELLER_ID, BASE_PRICE)));
         when(inventoryClient.reserve(PRODUCT_ID, 100))
-                .thenReturn(new InventoryReservationResult(false, "INSUFFICIENT_STOCK"));
+                .thenReturn(new InventoryReservationResult(false, "INSUFFICIENT_STOCK", 9));
         CreateDealRequest req = new CreateDealRequest(PRODUCT_ID, DEAL_PRICE, 100, 10, 1440);
 
         assertThatThrownBy(() -> dealService.createDeal(req, SELLER_ID))
-                .isInstanceOf(InsufficientStockException.class);
+                .isInstanceOf(InsufficientStockException.class)
+                .hasMessageContaining("requested 100, available 9");
     }
 
     @Test
