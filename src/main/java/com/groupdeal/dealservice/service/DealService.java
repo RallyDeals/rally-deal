@@ -112,13 +112,10 @@ public class DealService {
         if (!deal.getSellerId().equals(sellerId)) {
             throw new UnauthorizedException("You are not the seller of deal '" + dealId + "'");
         }
+
         if (deal.getStatus() != DealStatus.PENDING) {
-            throw new DealCancellationNotAllowedException(dealId); // TODO: change exception type
-        }
-        if (deal.getCurrentParticipants() > 0) {
             throw new InvalidDealConfigurationException(
-                    "Cannot update deal '" + dealId + "' — " + deal.getCurrentParticipants()
-                            + " participant(s) already joined. You must cancel this deal and create a new one."); // TODO: change exception msg
+                    "Cannot update deal '" + dealId + "' — It's already " + deal.getStatus());
         }
 
         if (request.minParticipants() > request.dealStock()) {
