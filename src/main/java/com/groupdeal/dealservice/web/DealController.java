@@ -1,5 +1,6 @@
 package com.groupdeal.dealservice.web;
 
+import com.groupdeal.dealservice.domain.DealStatus;
 import com.groupdeal.dealservice.service.DealService;
 import com.groupdeal.dealservice.web.dto.*;
 import jakarta.validation.Valid;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,6 +20,8 @@ import java.util.UUID;
 public class DealController {
 
     private final DealService dealService;
+
+    // ── Write endpoints ─────────────────────────────────────────────────────────
 
     @PostMapping
     public ResponseEntity<DealResponse> createDeal(
@@ -34,35 +38,72 @@ public class DealController {
         return ResponseEntity.status(HttpStatus.OK).body(dealService.updateDeal(id, request, sellerId));
     }
 
-    @GetMapping("/analytics")
-    public DealAnalyticsResponse getAnalytics(
-            @RequestHeader(value = "X-User-Id", required = false) UUID sellerId) {
-        return dealService.getAnalytics(sellerId);
-    }
-
-    @GetMapping
-    public ResponseEntity<Page<DealResponse>> listDeals(
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) UUID sellerId,
-            @RequestParam(required = false) UUID productId,
-            @RequestParam(required = false) UUID categoryId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(dealService.findAll(status, sellerId, productId, categoryId, page, size));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<DealResponse> getDeal(@PathVariable UUID id) {
-        return ResponseEntity.ok(dealService.getDeal(id));
-    }
-
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<DealResponse> cancelDeal(@PathVariable UUID id, @RequestHeader("X-User-Id") UUID sellerId) {
+    public ResponseEntity<DealResponse> cancelDeal(
+            @PathVariable UUID id,
+            @RequestHeader("X-User-Id") UUID sellerId) {
         return ResponseEntity.ok(dealService.cancelDeal(id, sellerId));
     }
 
     @PostMapping("/bulk")
     public ResponseEntity<List<DealResponse>> getDealsBulk(@RequestBody BulkDealRequest request) {
         return ResponseEntity.ok(dealService.findAllByIdsAndStatus(request.ids(), request.statuses()));
+    }
+
+    // ── Read endpoints ──────────────────────────────────────────────────────────
+
+    /**
+     * GET /deals/analytics
+     *
+     * IMPORTANT: this route MUST be declared before GET /deals/{id} so that Spring
+     * does not attempt to bind "analytics" as a UUID path variable.
+     */
+    @GetMapping("/analytics")
+    public DealAnalyticsResponse getAnalytics(
+            @RequestHeader(value = "X-User-Id", required = false) UUID sellerId) {
+        return dealService.getAnalytics(sellerId);
+    }
+
+    /**
+     * GET /deals — enriched paginated listing.
+     *
+     * All parameters are optional.
+     *
+     * @param search     filter by product name or seller name
+     * @param categories list of category UUIDs
+     * @param minPrice   minimum deal price (inclusive)
+     * @param maxPrice   maximum deal price (inclusive)
+     * @param sort       relevance | price-asc | price-desc | discount | ending-soon | most-joined | newest
+     * @param sellerId   filter by seller UUID
+     * @param status     comma-separated or repeated DealStatus values; defaults to ACTIVE,PENDING
+     * @param userId     buyer profile: filter deals the user has joined (all statuses)
+     * @param productId  product details page: shows deals for this product
+     * @param page       0-based page index (default 0)
+     * @param limit      page size (default 20)
+     */
+    @GetMapping
+    public ResponseEntity<Page<DealOverview>> listDeals(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) List<UUID> categories,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) UUID sellerId,
+            @RequestParam(required = false) List<DealStatus> status,
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(required = false) UUID productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(dealService.listDeals(
+                search, categories, minPrice, maxPrice, sort,
+                sellerId, status, userId, productId, page, limit));
+    }
+
+    /**
+     * GET /deals/{id} — enriched single deal with full product data from catalog.
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<DealDetails> getDeal(@PathVariable UUID id) {
+        return ResponseEntity.ok(dealService.getDealDetails(id));
     }
 }
