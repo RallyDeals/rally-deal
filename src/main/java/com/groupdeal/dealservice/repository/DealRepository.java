@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -167,4 +168,45 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
     long countByCreatedAtBetween(OffsetDateTime from, OffsetDateTime to);
 
     long countByStatusIn(Collection<DealStatus> statuses);
+
+    // ── Discount sort query (computed: (originalPrice - dealPrice) / originalPrice * 100) ───────────────────
+    @Query(value = """
+            SELECT d.*
+            FROM deals d
+            WHERE (:statuses IS NULL OR d.status IN :statuses)
+              AND (:sellerId IS NULL OR d.seller_id = :sellerId)
+              AND (:productId IS NULL OR d.product_id = :productId)
+              AND (:categoryId IS NULL OR d.category_id = :categoryId)
+              AND (:minPrice IS NULL OR d.deal_price >= :minPrice)
+              AND (:maxPrice IS NULL OR d.deal_price <= :maxPrice)
+            ORDER BY ((d.original_price - d.deal_price) / d.original_price * 100) DESC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Deal> findAllWithDiscountSort(
+            @Param("statuses") List<String> statuses,
+            @Param("sellerId") UUID sellerId,
+            @Param("productId") UUID productId,
+            @Param("categoryId") UUID categoryId,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice,
+            @Param("limit") int limit,
+            @Param("offset") int offset);
+
+    @Query(value = """
+            SELECT count(*)
+            FROM deals d
+            WHERE (:statuses IS NULL OR d.status IN :statuses)
+              AND (:sellerId IS NULL OR d.seller_id = :sellerId)
+              AND (:productId IS NULL OR d.product_id = :productId)
+              AND (:categoryId IS NULL OR d.category_id = :categoryId)
+              AND (:minPrice IS NULL OR d.deal_price >= :minPrice)
+              AND (:maxPrice IS NULL OR d.deal_price <= :maxPrice)
+            """, nativeQuery = true)
+    long countWithDiscountSortFilters(
+            @Param("statuses") List<String> statuses,
+            @Param("sellerId") UUID sellerId,
+            @Param("productId") UUID productId,
+            @Param("categoryId") UUID categoryId,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice);
 }

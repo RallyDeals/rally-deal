@@ -1,12 +1,17 @@
 package com.groupdeal.dealservice.web.dto;
 
-import java.math.BigDecimal;
-
+/**
+ * Analytics summary for GET /deals/analytics.
+ *
+ * activeDeals:   status IN (ACTIVE, PENDING)
+ * completedDeals: status IN (SUCCEEDED, FAILED)
+ * successRate:   completedDeals > 0 ? (succeededDeals / completedDeals * 100) : 0.0
+ */
 public record DealAnalyticsResponse(
         long totalDeals,
-        long dealsCreatedThisMonth,
+        long dealsThisMonth,
         long activeDeals,
-        long dealsCreatedToday,
+        long dealsToday,
         long completedDeals,
-        BigDecimal successRate
+        double successRate
 ) {}

@@ -6,6 +6,7 @@ import com.groupdeal.dealservice.client.CatalogClient;
 import com.groupdeal.dealservice.client.InventoryClient;
 import com.groupdeal.dealservice.client.dto.InventoryReservationResult;
 import com.groupdeal.dealservice.client.dto.ProductDto;
+import com.groupdeal.dealservice.client.dto.ProductSummaryDto;
 import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.domain.DealOutbox;
 import com.groupdeal.dealservice.domain.DealSlotRequest;
@@ -24,17 +25,19 @@ import com.rally.common.exceptions.shared.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Covers all user stories DS-01 through DS-13 from the design doc.
@@ -200,6 +203,26 @@ public class DealService {
         );
     }
 
+    /**
+     * Enriched single-deal detail — DealOverview fields + product description and images.
+     * Product data comes from CatalogClient.getProduct() (single-product endpoint).
+     * If catalog is unavailable, product fields are returned as null.
+     */
+    @Transactional(readOnly = true)
+    public DealDetails getDealDetails(UUID dealId) {
+        Deal deal = dealRepository.findById(dealId)
+                .orElseThrow(() -> new DealNotFoundException(dealId));
+
+        ProductDto product = null;
+        try {
+            product = catalogClient.getProduct(deal.getProductId()).orElse(null);
+        } catch (Exception e) {
+            log.warn("Catalog unavailable for deal {} product enrichment — returning null product fields", dealId, e);
+        }
+
+        return toDealDetails(deal, product);
+    }
+
     @Transactional(readOnly = true)
     public List<DealResponse> findAllByIdsAndStatus(List<UUID> ids, List<DealStatus> status) {
         List<Deal> deals = (status == null || status.isEmpty())
@@ -218,8 +241,12 @@ public class DealService {
                 List.of(DealStatus.PENDING, DealStatus.ACTIVE));
     }
 
-    // ── DS-04 / DS-05: List deals with filtering (§4.1) ────────────────────────
+    // ── DS-04 / DS-05: List deals with filtering + enrichment (§4.1) ───────────
 
+    /**
+     * Legacy overloads — preserved for internal callers (tests, bulk endpoint, etc.).
+     * The public-facing HTTP endpoint now goes through {@link #listDeals}.
+     */
     @Transactional(readOnly = true)
     public Page<DealResponse> findAll(String status, UUID sellerId, UUID productId, int page, int size) {
         return findAll(status, sellerId, productId, null, page, size);
@@ -248,6 +275,146 @@ public class DealService {
         }
 
         return dealRepository.findAll(spec, PageRequest.of(page, size)).map(dealMapper::toDealResponse);
+    }
+
+    /**
+     * Enriched deal listing supporting all query params from the spec.
+     *
+     * <p>Sorting, filtering, pagination are applied at the DB layer via Specifications.
+     * Product enrichment is done in a single bulk call to the catalog service.
+     * If catalog is unavailable the deals are returned with null product fields.
+     *
+     * @param search        filter by product name or seller name (client-side post-filter after catalog call for stub; DB-side where possible)
+     * @param categories    filter by one or more category UUIDs
+     * @param minPrice      minimum deal price (inclusive)
+     * @param maxPrice      maximum deal price (inclusive)
+     * @param sort          sort order: relevance|price-asc|price-desc|discount|ending-soon|most-joined|newest
+     * @param sellerId      filter by seller
+     * @param statuses      filter by status list; defaults to [ACTIVE, PENDING] when null/empty
+     * @param userId        future: filter deals the buyer has joined (not yet implemented — requires participation table)
+     * @param productId     filter by product
+     * @param page          0-based page index
+     * @param limit         page size
+     */
+    @Transactional(readOnly = true)
+    public Page<DealOverview> listDeals(
+            String search,
+            List<UUID> categories,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String sort,
+            UUID sellerId,
+            List<DealStatus> statuses,
+            UUID userId,
+            UUID productId,
+            int page,
+            int limit) {
+
+        Specification<Deal> spec = Specification.where(null);
+
+        // ── status filter — default to ACTIVE + PENDING when omitted ──────────────
+        List<DealStatus> effectiveStatuses = (statuses != null && !statuses.isEmpty())
+                ? statuses
+                : List.of(DealStatus.ACTIVE, DealStatus.PENDING);
+        spec = spec.and((root, q, cb) -> root.get("status").in(effectiveStatuses));
+
+        // ── scalar equality filters ───────────────────────────────────────────────
+        if (sellerId != null) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("sellerId"), sellerId));
+        }
+        if (productId != null) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("productId"), productId));
+        }
+
+        // ── category list filter ──────────────────────────────────────────────────
+        if (categories != null && !categories.isEmpty()) {
+            spec = spec.and((root, q, cb) -> root.get("categoryId").in(categories));
+        }
+
+        // ── price range ───────────────────────────────────────────────────────────
+        if (minPrice != null) {
+            spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("dealPrice"), minPrice));
+        }
+        if (maxPrice != null) {
+            spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("dealPrice"), maxPrice));
+        }
+
+        // ── sorting ────────────────────────────────────────────────────────────────
+        Sort dbSort = resolveSort(sort);
+        PageRequest pageRequest = PageRequest.of(page, limit, dbSort);
+
+        Page<Deal> dealPage;
+        boolean isDiscountSort = "discount".equalsIgnoreCase(sort);
+        if (isDiscountSort) {
+            // Use native query with computed discount percentage for proper sorting
+            // For category filter, use first category if multiple provided (simplification for native query)
+            UUID categoryForDiscountSort = (categories != null && !categories.isEmpty()) ? categories.get(0) : null;
+            // Convert statuses to strings for native query (stored as VARCHAR in DB)
+            List<String> statusStrings = effectiveStatuses.stream().map(Enum::name).toList();
+            int offset = page * limit;
+            List<Deal> deals = dealRepository.findAllWithDiscountSort(
+                    statusStrings, sellerId, productId, categoryForDiscountSort, minPrice, maxPrice, limit, offset);
+            long total = dealRepository.countWithDiscountSortFilters(
+                    statusStrings, sellerId, productId, categoryForDiscountSort, minPrice, maxPrice);
+            dealPage = new PageImpl<>(deals, pageRequest, total);
+        } else {
+            dealPage = dealRepository.findAll(spec, pageRequest);
+        }
+
+        // ── bulk catalog enrichment ───────────────────────────────────────────────
+        List<UUID> productIds = dealPage.getContent().stream()
+                .map(Deal::getProductId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<UUID, ProductSummaryDto> summaries;
+        try {
+            summaries = catalogClient.getProductSummaries(productIds);
+        } catch (Exception e) {
+            log.warn("Catalog Service unavailable for bulk product summary — returning null product fields", e);
+            summaries = Collections.emptyMap();
+        }
+
+        final Map<UUID, ProductSummaryDto> summariesFinal = summaries;
+
+        // ── map to DealOverview + optional search post-filter ─────────────────────
+        // NOTE: search filtering is applied after enrichment because the product name
+        // and seller name are not stored in the deals table. For production scale this
+        // should be handled by a search service or denormalised columns.
+        Page<DealOverview> overviewPage = dealPage.map(deal -> {
+            ProductSummaryDto summary = summariesFinal.get(deal.getProductId());
+            return toDealOverview(deal, summary);
+        });
+
+        // Post-filter by `search` if provided and catalog enrichment succeeded
+        if (search != null && !search.isBlank() && !summariesFinal.isEmpty()) {
+            String lc = search.toLowerCase();
+            List<DealOverview> filtered = overviewPage.getContent().stream()
+                    .filter(o -> {
+                        boolean matchName = o.productName() != null && o.productName().toLowerCase().contains(lc);
+                        boolean matchSeller = o.sellerName() != null && o.sellerName().toLowerCase().contains(lc);
+                        return matchName || matchSeller;
+                    })
+                    .collect(Collectors.toList());
+            // Wrap in a new Page preserving the original pagination metadata
+            return new PageImpl<>(filtered, pageRequest, overviewPage.getTotalElements());
+        }
+
+        return overviewPage;
+    }
+
+    // ── Sort resolution ──────────────────────────────────────────────────────────
+
+    private Sort resolveSort(String sort) {
+        if (sort == null) return Sort.by(Sort.Direction.DESC, "createdAt");
+        return switch (sort.toLowerCase()) {
+            case "price-asc"    -> Sort.by(Sort.Direction.ASC,  "dealPrice");
+            case "price-desc"   -> Sort.by(Sort.Direction.DESC, "dealPrice");
+            case "ending-soon"  -> Sort.by(Sort.Direction.ASC,  "endTime");
+            case "most-joined"  -> Sort.by(Sort.Direction.DESC, "currentParticipants");
+            case "newest"       -> Sort.by(Sort.Direction.DESC, "createdAt");
+            default             -> Sort.by(Sort.Direction.DESC, "createdAt"); // relevance, discount & unknown
+        };
     }
 
     // ── DS-06: Reserve slot (§5.4) ──────────────────────────────────────────────
@@ -461,36 +628,41 @@ public class DealService {
     @Transactional(readOnly = true)
     public DealAnalyticsResponse getAnalytics(UUID sellerId) {
         long total;
-        long active;
+        long activeDeals;  // ACTIVE + PENDING per spec
         long createdThisMonth;
         long createdToday;
-        long completed;
+        long completedDeals;    // SUCCEEDED only per spec
         long succeeded;
+        long failed;
 
         OffsetDateTime monthStart = YearMonth.now().atDay(1).atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
         OffsetDateTime dayStart = OffsetDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
 
+        List<DealStatus> activeStatuses = List.of(DealStatus.ACTIVE, DealStatus.PENDING);
+
         if (sellerId != null) {
-            total = dealRepository.countBySellerId(sellerId);
-            active = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.ACTIVE);
-            createdThisMonth = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, monthStart, OffsetDateTime.now());
-            createdToday = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, dayStart, OffsetDateTime.now());
-            completed = dealRepository.countBySellerIdAndStatusIn(sellerId, List.of(DealStatus.SUCCEEDED, DealStatus.FAILED));
-            succeeded = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.SUCCEEDED);
+            total             = dealRepository.countBySellerId(sellerId);
+            activeDeals       = dealRepository.countBySellerIdAndStatusIn(sellerId, activeStatuses);
+            createdThisMonth  = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, monthStart, OffsetDateTime.now());
+            createdToday      = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, dayStart, OffsetDateTime.now());
+            completedDeals    = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.SUCCEEDED);
+            failed            = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.FAILED);
+            succeeded         = completedDeals;
         } else {
-            total = dealRepository.count();
-            active = dealRepository.countByStatus(DealStatus.ACTIVE);
-            createdThisMonth = dealRepository.countByCreatedAtBetween(monthStart, OffsetDateTime.now());
-            createdToday = dealRepository.countByCreatedAtBetween(dayStart, OffsetDateTime.now());
-            completed = dealRepository.countByStatusIn(List.of(DealStatus.SUCCEEDED, DealStatus.FAILED));
-            succeeded = dealRepository.countByStatus(DealStatus.SUCCEEDED);
+            total             = dealRepository.count();
+            activeDeals       = dealRepository.countByStatusIn(activeStatuses);
+            createdThisMonth  = dealRepository.countByCreatedAtBetween(monthStart, OffsetDateTime.now());
+            createdToday      = dealRepository.countByCreatedAtBetween(dayStart, OffsetDateTime.now());
+            completedDeals    = dealRepository.countByStatus(DealStatus.SUCCEEDED);
+            failed            = dealRepository.countByStatus(DealStatus.FAILED);
+            succeeded         = completedDeals;
         }
 
-        BigDecimal successRate = completed > 0
-                ? BigDecimal.valueOf(succeeded).multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(completed), 1, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        double successRate = (completedDeals + failed) > 0
+                ? (double) succeeded / (completedDeals + failed) * 100.0
+                : 0.0;
 
-        return new DealAnalyticsResponse(total, createdThisMonth, active, createdToday, completed, successRate);
+        return new DealAnalyticsResponse(total, createdThisMonth, activeDeals, createdToday, completedDeals, successRate);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -522,6 +694,82 @@ public class DealService {
 
     private Deal getDealById(UUID id){
         return dealRepository.findById(id).orElseThrow(() -> new DealNotFoundException(id));
+    }
+
+    // ── DTO assembly ─────────────────────────────────────────────────────────────
+
+    private static int computeNeeded(Deal d) {
+        return Math.max(0, d.getMinParticipants() - d.getCurrentParticipants());
+    }
+
+    private static int computeProgress(Deal d) {
+        if (d.getDealStock() <= 0) return 0;
+        int pct = (d.getCurrentParticipants() * 100) / d.getDealStock();
+        return Math.min(100, pct);
+    }
+
+    private static long computeTimeRemaining(Deal d) {
+        if (d.getEndTime() == null) return 0L;
+        long secs = java.time.Duration.between(OffsetDateTime.now(), d.getEndTime()).getSeconds();
+        return Math.max(0L, secs);
+    }
+
+    private DealOverview toDealOverview(Deal deal, ProductSummaryDto summary) {
+        return new DealOverview(
+                deal.getId(),
+                deal.getProductId(),
+                deal.getSellerId(),
+                deal.getCategoryId(),
+                deal.getOriginalPrice(),
+                deal.getDealPrice(),
+                deal.getDealStock(),
+                deal.getCurrentParticipants(),
+                deal.getMinParticipants(),
+                deal.getAuthorizedCount(),
+                deal.getStatus(),
+                deal.getDurationMinutes(),
+                deal.getStartTime(),
+                deal.getEndTime(),
+                deal.getCreatedAt(),
+                computeNeeded(deal),
+                computeProgress(deal),
+                computeTimeRemaining(deal),
+                summary != null ? summary.name()       : null,
+                summary != null ? summary.imageUrl()   : null,
+                summary != null ? summary.category()   : null,
+                summary != null ? summary.sku()        : null,
+                summary != null ? summary.sellerName() : null
+        );
+    }
+
+    private DealDetails toDealDetails(Deal deal, ProductDto product) {
+        return new DealDetails(
+                deal.getId(),
+                deal.getProductId(),
+                deal.getSellerId(),
+                deal.getCategoryId(),
+                deal.getOriginalPrice(),
+                deal.getDealPrice(),
+                deal.getDealStock(),
+                deal.getCurrentParticipants(),
+                deal.getMinParticipants(),
+                deal.getAuthorizedCount(),
+                deal.getStatus(),
+                deal.getDurationMinutes(),
+                deal.getStartTime(),
+                deal.getEndTime(),
+                deal.getCreatedAt(),
+                computeNeeded(deal),
+                computeProgress(deal),
+                computeTimeRemaining(deal),
+                product != null ? product.name()        : null,
+                product != null ? product.imageUrl()    : null,
+                product != null ? product.category()    : null,
+                product != null ? product.sku()         : null,
+                product != null ? product.sellerName()  : null,
+                product != null ? product.description() : null,
+                product != null ? product.images()      : null
+        );
     }
 
     // ── Event payload builders ──────────────────────────────────────────────────
