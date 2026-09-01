@@ -2,6 +2,7 @@ package com.groupdeal.dealservice.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.groupdeal.dealservice.client.dto.ProductDto;
+import com.groupdeal.dealservice.client.dto.ProductSummaryDto;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +16,8 @@ import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 @Slf4j
 @Component
@@ -59,6 +62,46 @@ public class CatalogClientHttp implements CatalogClient {
         }
     }
 
+    /**
+     * Bulk summary fetch — single HTTP call for all productIds on a page.
+     * Falls back to an empty map when the catalog circuit is open or the request fails,
+     * so the listing endpoint degrades gracefully (deals are returned with null product fields).
+     */
+    @Override
+    @CircuitBreaker(name = "catalogService", fallbackMethod = "getProductSummariesFallback")
+    public Map<UUID, ProductSummaryDto> getProductSummaries(List<UUID> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        String ids = productIds.stream()
+                .map(UUID::toString)
+                .collect(Collectors.joining(","));
+
+        JsonNode json = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/products/summary")
+                        .queryParam("ids", ids)
+                        .build())
+                .retrieve()
+                .body(JsonNode.class);
+
+        if (json == null || json.isNull() || !json.isArray()) {
+            log.warn("Catalog Service returned unexpected body for bulk summary: {}", json);
+            return Collections.emptyMap();
+        }
+
+        Map<UUID, ProductSummaryDto> result = new HashMap<>();
+        for (JsonNode node : json) {
+            ProductSummaryDto summary = mapToProductSummaryDto(node);
+            if (summary != null) {
+                result.put(summary.productId(), summary);
+            }
+        }
+        return result;
+    }
+
+    // ── Mapping helpers ──────────────────────────────────────────────────────────
 
     private ProductDto mapToProductDto(UUID productId, JsonNode json) {
         String name = json.has("name") ? json.get("name").asText(null) : null;
@@ -91,12 +134,71 @@ public class CatalogClientHttp implements CatalogClient {
         String sellerName = json.has("sellerName") ? json.get("sellerName").asText(null) : null;
         BigDecimal basePrice = json.has("basePrice") ? json.get("basePrice").decimalValue() : null;
 
-        return new ProductDto(productId, sellerId, basePrice, name, imageUrl, category, categoryId, sku, sellerName);
+        String description = json.has("description") ? json.get("description").asText(null) : null;
+        List<String> images = null;
+        if (json.has("images") && json.get("images").isArray()) {
+            images = StreamSupport.stream(json.get("images").spliterator(), false)
+                    .map(JsonNode::asText)
+                    .collect(Collectors.toList());
+        }
+
+        return new ProductDto(productId, sellerId, basePrice, name, imageUrl, category, categoryId, sku, sellerName, description, images);
     }
+
+    private ProductSummaryDto mapToProductSummaryDto(JsonNode node) {
+        if (!node.has("id") && !node.has("productId")) {
+            log.warn("Catalog summary item missing id field: {}", node);
+            return null;
+        }
+
+        UUID productId;
+        try {
+            String rawId = node.has("id") ? node.get("id").asText() : node.get("productId").asText();
+            productId = UUID.fromString(rawId);
+        } catch (IllegalArgumentException e) {
+            log.warn("Catalog summary item has unparseable id: {}", node);
+            return null;
+        }
+
+        String name = node.has("name") ? node.get("name").asText(null) : null;
+        String imageUrl = node.has("imageUrl") ? node.get("imageUrl").asText(null) : null;
+        String sku = node.has("sku") ? node.get("sku").asText(null) : null;
+        String sellerName = node.has("sellerName") ? node.get("sellerName").asText(null) : null;
+        String description = node.has("description") ? node.get("description").asText(null) : null;
+
+        // category can be a string or an object with a "name" field
+        String category = null;
+        if (node.has("category") && !node.get("category").isNull()) {
+            JsonNode cat = node.get("category");
+            if (cat.isObject()) {
+                category = cat.has("name") ? cat.get("name").asText(null) : null;
+            } else if (cat.isTextual()) {
+                category = cat.asText();
+            }
+        }
+
+        // images as a list of strings
+        List<String> images = null;
+        if (node.has("images") && node.get("images").isArray()) {
+            images = StreamSupport.stream(node.get("images").spliterator(), false)
+                    .map(JsonNode::asText)
+                    .collect(Collectors.toList());
+        }
+
+        return new ProductSummaryDto(productId, name, imageUrl, category, sku, sellerName, description, images);
+    }
+
+    // ── Fallbacks ────────────────────────────────────────────────────────────────
 
     @SuppressWarnings("unused")
     private Optional<ProductDto> getProductFallback(UUID productId, Throwable t) {
         log.error("Catalog Service unavailable while fetching product {} (circuit open or request failed)", productId, t);
         throw new IllegalStateException("Catalog Service unavailable while fetching product " + productId, t);
+    }
+
+    @SuppressWarnings("unused")
+    private Map<UUID, ProductSummaryDto> getProductSummariesFallback(List<UUID> productIds, Throwable t) {
+        log.warn("Catalog Service unavailable for bulk product summary (circuit open or request failed) — degrading gracefully", t);
+        return Collections.emptyMap();
     }
 }

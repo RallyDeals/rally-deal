@@ -1,7 +1,10 @@
 package com.groupdeal.dealservice.client;
 
 import com.groupdeal.dealservice.client.dto.ProductDto;
+import com.groupdeal.dealservice.client.dto.ProductSummaryDto;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,4 +20,13 @@ public interface CatalogClient {
      * @return empty if the product doesn't exist (maps to 404 PRODUCT_NOT_FOUND).
      */
     Optional<ProductDto> getProduct(UUID productId);
+
+    /**
+     * Bulk fetch of compact product summaries.
+     * Used by the deal-list enrichment path — single call for all productIds on a page.
+     *
+     * @return map from productId to summary; missing IDs are simply absent from the map.
+     *         Returns an empty map when the catalog is unavailable (graceful degradation).
+     */
+    Map<UUID, ProductSummaryDto> getProductSummaries(List<UUID> productIds);
 }

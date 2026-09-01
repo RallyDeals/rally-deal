@@ -16,13 +16,15 @@ public record ProductDto(
         String category,
         UUID categoryId,
         String sku,
-        String sellerName
+        String sellerName,
+        String description,
+        java.util.List<String> images
 ) {
     public ProductDto(UUID productId, UUID sellerId, BigDecimal basePrice) {
-        this(productId, sellerId, basePrice, null, null, null, null, null, null);
+        this(productId, sellerId, basePrice, null, null, null, null, null, null, null, null);
     }
 
     public ProductDto(UUID productId, UUID sellerId, BigDecimal basePrice, UUID categoryId) {
-        this(productId, sellerId, basePrice, null, null, null, categoryId, null, null);
+        this(productId, sellerId, basePrice, null, null, null, categoryId, null, null, null, null);
     }
 }
