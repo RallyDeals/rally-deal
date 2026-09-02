@@ -290,8 +290,7 @@ public class DealService {
      * @param maxPrice      maximum deal price (inclusive)
      * @param sort          sort order: relevance|price-asc|price-desc|discount|ending-soon|most-joined|newest
      * @param sellerId      filter by seller
-     * @param statuses      filter by status list; defaults to [ACTIVE, PENDING] when null/empty
-     * @param userId        future: filter deals the buyer has joined (not yet implemented — requires participation table)
+     * @param statuses      filter by status list; defaults to [ACTIVE, PENDING] when null/empty. Pass ALL to include every status.
      * @param productId     filter by product
      * @param page          0-based page index
      * @param limit         page size
@@ -305,16 +304,16 @@ public class DealService {
             String sort,
             UUID sellerId,
             List<DealStatus> statuses,
-            UUID userId,
             UUID productId,
             int page,
             int limit) {
 
         Specification<Deal> spec = Specification.where(null);
 
-        // ── status filter — default to ACTIVE + PENDING when omitted ──────────────
-        List<DealStatus> effectiveStatuses = (statuses != null && !statuses.isEmpty())
-                ? statuses
+        // ── status filter — resolve ALL, then default to ACTIVE + PENDING when omitted ──
+        List<DealStatus> resolved = DealStatus.resolve(statuses);
+        List<DealStatus> effectiveStatuses = (resolved != null && !resolved.isEmpty())
+                ? resolved
                 : List.of(DealStatus.ACTIVE, DealStatus.PENDING);
         spec = spec.and((root, q, cb) -> root.get("status").in(effectiveStatuses));
 

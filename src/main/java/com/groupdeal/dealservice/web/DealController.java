@@ -75,8 +75,7 @@ public class DealController {
      * @param maxPrice   maximum deal price (inclusive)
      * @param sort       relevance | price-asc | price-desc | discount | ending-soon | most-joined | newest
      * @param sellerId   filter by seller UUID
-     * @param status     comma-separated or repeated DealStatus values; defaults to ACTIVE,PENDING
-     * @param userId     buyer profile: filter deals the user has joined (all statuses)
+     * @param status     comma-separated or repeated DealStatus values; defaults to ACTIVE,PENDING. Use ALL to include every status.
      * @param productId  product details page: shows deals for this product
      * @param page       0-based page index (default 0)
      * @param limit      page size (default 20)
@@ -90,13 +89,12 @@ public class DealController {
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) UUID sellerId,
             @RequestParam(required = false) List<DealStatus> status,
-            @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) UUID productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(dealService.listDeals(
                 search, categories, minPrice, maxPrice, sort,
-                sellerId, status, userId, productId, page, limit));
+                sellerId, status, productId, page, limit));
     }
 
     /**
