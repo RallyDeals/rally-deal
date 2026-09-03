@@ -101,7 +101,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_defaultsToActiveAndPending() {
-        var page = dealService.listDeals(null, null, null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 20);
 
         assertThat(page.getContent()).hasSize(4); // 2 PENDING + 2 ACTIVE
         assertThat(page.getContent()).extracting(DealOverview::status)
@@ -110,7 +110,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_withExplicitStatus_returnsOnlyMatching() {
-        var page = dealService.listDeals(null, null, null, null, null, null, List.of(DealStatus.PENDING), null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, null, List.of(DealStatus.PENDING), null, 0, 20);
 
         assertThat(page.getContent()).hasSize(2); // deal2, deal3
         assertThat(page.getContent()).extracting(DealOverview::status).containsOnly(DealStatus.PENDING);
@@ -118,7 +118,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_withMultipleStatuses() {
-        var page = dealService.listDeals(null, null, null, null, null, null, List.of(DealStatus.PENDING, DealStatus.SUCCEEDED), null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, null, List.of(DealStatus.PENDING, DealStatus.SUCCEEDED), null, 0, 20);
 
         assertThat(page.getContent()).hasSize(3); // 2 PENDING + 1 SUCCEEDED
         assertThat(page.getContent()).extracting(DealOverview::status)
@@ -129,7 +129,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterBySellerId() {
-        var page = dealService.listDeals(null, null, null, null, null, SELLER, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, SELLER, null, null, 0, 20);
 
         assertThat(page.getContent()).hasSize(4); // 4 deals by SELLER with default status filter (ACTIVE+PENDING)
         assertThat(page.getContent()).extracting(DealOverview::sellerId).containsOnly(SELLER);
@@ -137,7 +137,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterBySellerId_withStatus() {
-        var page = dealService.listDeals(null, null, null, null, null, SELLER, List.of(DealStatus.ACTIVE), null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, SELLER, List.of(DealStatus.ACTIVE), null, 0, 20);
 
         assertThat(page.getContent()).hasSize(2); // deal1 and deal5 are ACTIVE
         assertThat(page.getContent()).extracting(DealOverview::status).containsOnly(DealStatus.ACTIVE);
@@ -147,7 +147,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterByProductId() {
-        var page = dealService.listDeals(null, null, null, null, null, null, null, null, productId1, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, null, null, productId1, 0, 20);
 
         assertThat(page.getContent()).hasSize(2); // deal1 and deal5 (both use productId1)
         assertThat(page.getContent()).extracting(DealOverview::productId).containsOnly(productId1);
@@ -157,7 +157,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterBySingleCategory() {
-        var page = dealService.listDeals(null, List.of(categoryId1), null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, List.of(categoryId1), null, null, null, null, null, null, 0, 20);
 
         // categoryId1 is from productId1, which is used by deal1 and deal5
         // deal2 uses productId2 which has a different category
@@ -167,7 +167,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterByMultipleCategories() {
-        var page = dealService.listDeals(null, List.of(categoryId1, categoryId2), null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, List.of(categoryId1, categoryId2), null, null, null, null, null, null, 0, 20);
 
         // categoryId1: deal1, deal5; categoryId2: deal2 (productId2)
         // deal3 uses productId3 (categoryId3), deal4 uses productId4 (categoryId4)
@@ -179,7 +179,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterByMinPrice() {
-        var page = dealService.listDeals(null, null, PRICE_149, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, PRICE_149, null, null, null, null, null, 0, 20);
 
         // Deals with price >= 149.99: deal1 (149.99), deal3 (179.99), deal5 (149.99), deal4 (149.99 but SUCCEEDED so not in default)
         // Default status filter is ACTIVE+PENDING, so deal4 excluded
@@ -189,7 +189,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterByMaxPrice() {
-        var page = dealService.listDeals(null, null, null, PRICE_149, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, PRICE_149, null, null, null, null, 0, 20);
 
         // Deals with price <= 149.99: deal1 (149.99), deal2 (99.99), deal5 (149.99)
         assertThat(page.getContent()).hasSize(3); // deal1, deal2, deal5
@@ -198,7 +198,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_filterByPriceRange() {
-        var page = dealService.listDeals(null, null, new BigDecimal("100"), new BigDecimal("180"), null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, new BigDecimal("100"), new BigDecimal("180"), null, null, null, null, 0, 20);
 
         // Deals with price 100-180: deal1 (149.99), deal5 (149.99), deal3 (179.99)
         // deal4 is SUCCEEDED so excluded by default
@@ -210,7 +210,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_sortByPriceAsc() {
-        var page = dealService.listDeals(null, null, null, null, "price-asc", null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, "price-asc", null, null, null, 0, 20);
 
         List<BigDecimal> prices = page.getContent().stream().map(DealOverview::dealPrice).toList();
         assertThat(prices).isSorted();
@@ -218,7 +218,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_sortByPriceDesc() {
-        var page = dealService.listDeals(null, null, null, null, "price-desc", null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, "price-desc", null, null, null, 0, 20);
 
         List<BigDecimal> prices = page.getContent().stream().map(DealOverview::dealPrice).toList();
         assertThat(prices).isSortedAccordingTo((a, b) -> b.compareTo(a));
@@ -226,7 +226,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_sortByDiscount_computesPercentage() {
-        var page = dealService.listDeals(null, null, null, null, "discount", null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, "discount", null, null, null, 0, 20);
 
         // Discount = (originalPrice - dealPrice) / originalPrice * 100
         // Stub originalPrice is always 199.99
@@ -241,7 +241,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_sortByEndingSoon() {
-        var page = dealService.listDeals(null, null, null, null, "ending-soon", null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, "ending-soon", null, null, null, 0, 20);
 
         // Active deals have endTime, pending deals have null endTime
         // Should sort by endTime ASC (nulls last)
@@ -250,7 +250,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_sortByMostJoined() {
-        var page = dealService.listDeals(null, null, null, null, "most-joined", null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, "most-joined", null, null, null, 0, 20);
 
         List<Integer> participants = page.getContent().stream().map(DealOverview::currentParticipants).toList();
         assertThat(participants).isSortedAccordingTo((a, b) -> b - a); // DESC
@@ -258,7 +258,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_sortByNewest() {
-        var page = dealService.listDeals(null, null, null, null, "newest", null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, "newest", null, null, null, 0, 20);
 
         // Should sort by createdAt DESC
         assertThat(page.getContent()).isNotEmpty();
@@ -270,7 +270,7 @@ class DealListIntegrationTest {
     void listDeals_filterBySearch_productName() {
         // Stub product name is "Stub Product {uuid-prefix}"
         String searchTerm = productId1.toString().substring(0, 8);
-        var page = dealService.listDeals(searchTerm, null, null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(searchTerm, null, null, null, null, null, null, null, 0, 20);
 
         // Should find deals with productId1 (dealId1 and dealId5)
         assertThat(page.getContent()).hasSize(2);
@@ -280,7 +280,7 @@ class DealListIntegrationTest {
     @Test
     void listDeals_filterBySearch_sellerName() {
         // Stub seller name is "Stub Seller"
-        var page = dealService.listDeals("Stub Seller", null, null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals("Stub Seller", null, null, null, null, null, null, null, 0, 20);
 
         // All deals have stub seller name
         assertThat(page.getContent()).hasSize(4);
@@ -290,7 +290,7 @@ class DealListIntegrationTest {
     void listDeals_searchWithNoCatalogData_returnsEmpty() {
         // When catalog is unavailable, search should return empty (no enrichment to search against)
         // This is tested implicitly by the stub always returning data
-        var page = dealService.listDeals("NonExistentProduct", null, null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals("NonExistentProduct", null, null, null, null, null, null, null, 0, 20);
         assertThat(page.getContent()).isEmpty();
     }
 
@@ -298,7 +298,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_pagination_pageSize() {
-        var page = dealService.listDeals(null, null, null, null, null, null, null, null, null, 0, 2);
+        var page = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 2);
 
         assertThat(page.getContent()).hasSize(2);
         assertThat(page.getTotalElements()).isEqualTo(4);
@@ -307,8 +307,8 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_pagination_secondPage() {
-        var page1 = dealService.listDeals(null, null, null, null, null, null, null, null, null, 0, 2);
-        var page2 = dealService.listDeals(null, null, null, null, null, null, null, null, null, 1, 2);
+        var page1 = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 2);
+        var page2 = dealService.listDeals(null, null, null, null, null, null, null, null, 1, 2);
 
         assertThat(page1.getContent()).hasSize(2);
         assertThat(page2.getContent()).hasSize(2);
@@ -319,7 +319,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_computedFields_areCorrect() {
-        var page = dealService.listDeals(null, null, null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 20);
 
         for (DealOverview deal : page.getContent()) {
             // neededCount = max(0, minParticipants - currentParticipants)
@@ -346,7 +346,7 @@ class DealListIntegrationTest {
 
     @Test
     void listDeals_enrichment_includesProductFields() {
-        var page = dealService.listDeals(null, null, null, null, null, null, null, null, null, 0, 20);
+        var page = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 20);
 
         for (DealOverview deal : page.getContent()) {
             assertThat(deal.productName()).isNotNull().startsWith("Stub Product");
@@ -368,7 +368,6 @@ class DealListIntegrationTest {
                 new BigDecimal("200"),
                 "price-asc",
                 SELLER,
-                null,
                 null,
                 null,
                 0, 10);
