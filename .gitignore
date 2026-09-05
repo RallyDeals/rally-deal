@@ -16,3 +16,4 @@ target/
 .env
 start.sh
 stop.sh
+.apt_generated/
