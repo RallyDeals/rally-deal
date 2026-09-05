@@ -32,17 +32,7 @@ public record DealDetails(
         OffsetDateTime endTime,
         OffsetDateTime createdAt,
 
-        // ── computed ────────────────────────────────────────────────────────
-        int neededCount,
-        int progressPercent,
-        long timeRemainingInSeconds,
-
         // ── enriched from catalog (single-product endpoint) ─────────────────
-        String productName,
-        String productImageUrl,
-        String category,
-        String sku,
-        String sellerName,
         String productDescription,
         List<String> productImages
 ) { }

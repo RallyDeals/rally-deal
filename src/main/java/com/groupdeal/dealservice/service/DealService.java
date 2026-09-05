@@ -6,7 +6,6 @@ import com.groupdeal.dealservice.client.CatalogClient;
 import com.groupdeal.dealservice.client.InventoryClient;
 import com.groupdeal.dealservice.client.dto.InventoryReservationResult;
 import com.groupdeal.dealservice.client.dto.ProductDto;
-import com.groupdeal.dealservice.client.dto.ProductSummaryDto;
 import com.groupdeal.dealservice.domain.Deal;
 import com.groupdeal.dealservice.domain.DealOutbox;
 import com.groupdeal.dealservice.domain.DealSlotRequest;
@@ -37,7 +36,6 @@ import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Covers all user stories DS-01 through DS-13 from the design doc.
@@ -360,46 +358,8 @@ public class DealService {
             dealPage = dealRepository.findAll(spec, pageRequest);
         }
 
-        // ── bulk catalog enrichment ───────────────────────────────────────────────
-        List<UUID> productIds = dealPage.getContent().stream()
-                .map(Deal::getProductId)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<UUID, ProductSummaryDto> summaries;
-        try {
-            summaries = catalogClient.getProductSummaries(productIds);
-        } catch (Exception e) {
-            log.warn("Catalog Service unavailable for bulk product summary — returning null product fields", e);
-            summaries = Collections.emptyMap();
-        }
-
-        final Map<UUID, ProductSummaryDto> summariesFinal = summaries;
-
-        // ── map to DealOverview + optional search post-filter ─────────────────────
-        // NOTE: search filtering is applied after enrichment because the product name
-        // and seller name are not stored in the deals table. For production scale this
-        // should be handled by a search service or denormalised columns.
-        Page<DealOverview> overviewPage = dealPage.map(deal -> {
-            ProductSummaryDto summary = summariesFinal.get(deal.getProductId());
-            return toDealOverview(deal, summary);
-        });
-
-        // Post-filter by `search` if provided and catalog enrichment succeeded
-        if (search != null && !search.isBlank() && !summariesFinal.isEmpty()) {
-            String lc = search.toLowerCase();
-            List<DealOverview> filtered = overviewPage.getContent().stream()
-                    .filter(o -> {
-                        boolean matchName = o.productName() != null && o.productName().toLowerCase().contains(lc);
-                        boolean matchSeller = o.sellerName() != null && o.sellerName().toLowerCase().contains(lc);
-                        return matchName || matchSeller;
-                    })
-                    .collect(Collectors.toList());
-            // Wrap in a new Page preserving the original pagination metadata
-            return new PageImpl<>(filtered, pageRequest, overviewPage.getTotalElements());
-        }
-
-        return overviewPage;
+        // ── map to DealOverview ───────────────────────────────────────────────────
+        return dealPage.map(this::toDealOverview);
     }
 
     // ── Sort resolution ──────────────────────────────────────────────────────────
@@ -697,23 +657,7 @@ public class DealService {
 
     // ── DTO assembly ─────────────────────────────────────────────────────────────
 
-    private static int computeNeeded(Deal d) {
-        return Math.max(0, d.getMinParticipants() - d.getCurrentParticipants());
-    }
-
-    private static int computeProgress(Deal d) {
-        if (d.getDealStock() <= 0) return 0;
-        int pct = (d.getCurrentParticipants() * 100) / d.getDealStock();
-        return Math.min(100, pct);
-    }
-
-    private static long computeTimeRemaining(Deal d) {
-        if (d.getEndTime() == null) return 0L;
-        long secs = java.time.Duration.between(OffsetDateTime.now(), d.getEndTime()).getSeconds();
-        return Math.max(0L, secs);
-    }
-
-    private DealOverview toDealOverview(Deal deal, ProductSummaryDto summary) {
+    private DealOverview toDealOverview(Deal deal) {
         return new DealOverview(
                 deal.getId(),
                 deal.getProductId(),
@@ -729,15 +673,7 @@ public class DealService {
                 deal.getDurationMinutes(),
                 deal.getStartTime(),
                 deal.getEndTime(),
-                deal.getCreatedAt(),
-                computeNeeded(deal),
-                computeProgress(deal),
-                computeTimeRemaining(deal),
-                summary != null ? summary.name()       : null,
-                summary != null ? summary.imageUrl()   : null,
-                summary != null ? summary.category()   : null,
-                summary != null ? summary.sku()        : null,
-                summary != null ? summary.sellerName() : null
+                deal.getCreatedAt()
         );
     }
 
@@ -758,14 +694,6 @@ public class DealService {
                 deal.getStartTime(),
                 deal.getEndTime(),
                 deal.getCreatedAt(),
-                computeNeeded(deal),
-                computeProgress(deal),
-                computeTimeRemaining(deal),
-                product != null ? product.name()        : null,
-                product != null ? product.imageUrl()    : null,
-                product != null ? product.category()    : null,
-                product != null ? product.sku()         : null,
-                product != null ? product.sellerName()  : null,
                 product != null ? product.description() : null,
                 product != null ? product.images()      : null
         );

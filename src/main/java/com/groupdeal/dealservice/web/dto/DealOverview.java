@@ -28,20 +28,5 @@ public record DealOverview(
         int durationMinutes,
         OffsetDateTime startTime,
         OffsetDateTime endTime,
-        OffsetDateTime createdAt,
-
-        // ── computed ────────────────────────────────────────────────────────
-        /** max(0, minParticipants - currentParticipants) */
-        int neededCount,
-        /** (currentParticipants * 100) / dealStock, capped at 100 */
-        int progressPercent,
-        /** max(0, seconds between now and endTime); 0 if endTime null or past */
-        long timeRemainingInSeconds,
-
-        // ── enriched from catalog ───────────────────────────────────────────
-        String productName,
-        String productImageUrl,
-        String category,
-        String sku,
-        String sellerName
+        OffsetDateTime createdAt
 ) { }

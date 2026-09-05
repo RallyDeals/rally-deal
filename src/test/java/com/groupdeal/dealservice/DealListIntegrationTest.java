@@ -264,35 +264,6 @@ class DealListIntegrationTest {
         assertThat(page.getContent()).isNotEmpty();
     }
 
-    // ── Search filter (post-filter after catalog enrichment) ────────────────────
-
-    @Test
-    void listDeals_filterBySearch_productName() {
-        // Stub product name is "Stub Product {uuid-prefix}"
-        String searchTerm = productId1.toString().substring(0, 8);
-        var page = dealService.listDeals(searchTerm, null, null, null, null, null, null, null, 0, 20);
-
-        // Should find deals with productId1 (dealId1 and dealId5)
-        assertThat(page.getContent()).hasSize(2);
-        assertThat(page.getContent()).extracting(DealOverview::productId).containsOnly(productId1);
-    }
-
-    @Test
-    void listDeals_filterBySearch_sellerName() {
-        // Stub seller name is "Stub Seller"
-        var page = dealService.listDeals("Stub Seller", null, null, null, null, null, null, null, 0, 20);
-
-        // All deals have stub seller name
-        assertThat(page.getContent()).hasSize(4);
-    }
-
-    @Test
-    void listDeals_searchWithNoCatalogData_returnsEmpty() {
-        // When catalog is unavailable, search should return empty (no enrichment to search against)
-        // This is tested implicitly by the stub always returning data
-        var page = dealService.listDeals("NonExistentProduct", null, null, null, null, null, null, null, 0, 20);
-        assertThat(page.getContent()).isEmpty();
-    }
 
     // ── Pagination ──────────────────────────────────────────────────────────────
 
@@ -315,46 +286,6 @@ class DealListIntegrationTest {
         assertThat(page1.getContent().get(0).id()).isNotEqualTo(page2.getContent().get(0).id());
     }
 
-    // ── Computed fields ─────────────────────────────────────────────────────────
-
-    @Test
-    void listDeals_computedFields_areCorrect() {
-        var page = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 20);
-
-        for (DealOverview deal : page.getContent()) {
-            // neededCount = max(0, minParticipants - currentParticipants)
-            int expectedNeeded = Math.max(0, deal.minParticipants() - deal.currentParticipants());
-            assertThat(deal.neededCount()).isEqualTo(expectedNeeded);
-
-            // progressPercent = (currentParticipants * 100) / dealStock, capped at 100
-            int expectedProgress = deal.dealStock() > 0
-                    ? Math.min(100, (deal.currentParticipants() * 100) / deal.dealStock())
-                    : 0;
-            assertThat(deal.progressPercent()).isEqualTo(expectedProgress);
-
-            // timeRemainingInSeconds = max(0, seconds between now and endTime)
-            if (deal.endTime() != null) {
-                long expectedSeconds = Math.max(0, java.time.Duration.between(java.time.OffsetDateTime.now(), deal.endTime()).getSeconds());
-                assertThat(deal.timeRemainingInSeconds()).isEqualTo(expectedSeconds);
-            } else {
-                assertThat(deal.timeRemainingInSeconds()).isZero();
-            }
-        }
-    }
-
-    // ── Enrichment ──────────────────────────────────────────────────────────────
-
-    @Test
-    void listDeals_enrichment_includesProductFields() {
-        var page = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 20);
-
-        for (DealOverview deal : page.getContent()) {
-            assertThat(deal.productName()).isNotNull().startsWith("Stub Product");
-            assertThat(deal.category()).isEqualTo("Stub Category");
-            assertThat(deal.sku()).isNotNull().startsWith("SKU-");
-            assertThat(deal.sellerName()).isEqualTo("Stub Seller");
-        }
-    }
 
     // ── Combined filters ────────────────────────────────────────────────────────
 
