@@ -202,23 +202,14 @@ public class DealService {
     }
 
     /**
-     * Enriched single-deal detail — DealOverview fields + product description and images.
-     * Product data comes from CatalogClient.getProduct() (single-product endpoint).
-     * If catalog is unavailable, product fields are returned as null.
+     * Single-deal detail. Note: Product data enrichment is no longer performed by this service.
      */
     @Transactional(readOnly = true)
     public DealDetails getDealDetails(UUID dealId) {
         Deal deal = dealRepository.findById(dealId)
                 .orElseThrow(() -> new DealNotFoundException(dealId));
 
-        ProductDto product = null;
-        try {
-            product = catalogClient.getProduct(deal.getProductId()).orElse(null);
-        } catch (Exception e) {
-            log.warn("Catalog unavailable for deal {} product enrichment — returning null product fields", dealId, e);
-        }
-
-        return toDealDetails(deal, product);
+        return toDealDetails(deal);
     }
 
     @Transactional(readOnly = true)
@@ -677,7 +668,7 @@ public class DealService {
         );
     }
 
-    private DealDetails toDealDetails(Deal deal, ProductDto product) {
+    private DealDetails toDealDetails(Deal deal) {
         return new DealDetails(
                 deal.getId(),
                 deal.getProductId(),
@@ -693,9 +684,7 @@ public class DealService {
                 deal.getDurationMinutes(),
                 deal.getStartTime(),
                 deal.getEndTime(),
-                deal.getCreatedAt(),
-                product != null ? product.description() : null,
-                product != null ? product.images()      : null
+                deal.getCreatedAt()
         );
     }
 

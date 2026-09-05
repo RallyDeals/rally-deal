@@ -25,7 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration tests for GET /deals list endpoint (DealService.listDeals).
- * Tests all filter combinations: search, categories, price range, sort, sellerId, status, productId, pagination.
+ * Tests filter combinations: categories, price range, sort, sellerId, status, productId, pagination.
+ * Note: search parameter is accepted but not functional (no catalog enrichment).
+ * Note: computed fields (neededCount, progressPercent, timeRemainingInSeconds) and
+ * enrichment fields (productName, sellerName, category, sku, productImageUrl) removed from DTO.
  */
 @SpringBootTest
 @Testcontainers
@@ -123,6 +126,14 @@ class DealListIntegrationTest {
         assertThat(page.getContent()).hasSize(3); // 2 PENDING + 1 SUCCEEDED
         assertThat(page.getContent()).extracting(DealOverview::status)
                 .containsOnly(DealStatus.PENDING, DealStatus.SUCCEEDED);
+    }
+
+    @Test
+    void listDeals_withAllStatuses() {
+        var page = dealService.listDeals(null, null, null, null, null, null, List.of(DealStatus.ALL), null, 0, 20);
+
+        // All 5 deals created in setup (2 PENDING + 2 ACTIVE + 1 SUCCEEDED)
+        assertThat(page.getContent()).hasSize(5);
     }
 
     // ── Seller filter ────────────────────────────────────────────────────────────
@@ -230,9 +241,9 @@ class DealListIntegrationTest {
 
         // Discount = (originalPrice - dealPrice) / originalPrice * 100
         // Stub originalPrice is always 199.99
-        // dealId2: dealPrice=99.99 -> discount = (199.99-99.99)/199.99*100 = 50%
-        // dealId1/5: dealPrice=149.99 -> discount = (199.99-149.99)/199.99*100 = 25%
-        // dealId3: dealPrice=199.99 -> discount = 0%
+        // deal2: dealPrice=99.99 -> discount = (199.99-99.99)/199.99*100 = 50%
+        // deal1/5: dealPrice=149.99 -> discount = (199.99-149.99)/199.99*100 = 25%
+        // deal3: dealPrice=179.99 -> discount = (199.99-179.99)/199.99*100 = 10%
         List<Integer> discounts = page.getContent().stream()
                 .map(d -> (int) (((d.originalPrice().subtract(d.dealPrice())).divide(d.originalPrice(), 4, java.math.RoundingMode.HALF_UP).multiply(new BigDecimal("100"))).intValue()))
                 .toList();
@@ -264,7 +275,6 @@ class DealListIntegrationTest {
         assertThat(page.getContent()).isNotEmpty();
     }
 
-
     // ── Pagination ──────────────────────────────────────────────────────────────
 
     @Test
@@ -286,7 +296,6 @@ class DealListIntegrationTest {
         assertThat(page1.getContent().get(0).id()).isNotEqualTo(page2.getContent().get(0).id());
     }
 
-
     // ── Combined filters ────────────────────────────────────────────────────────
 
     @Test
@@ -303,9 +312,34 @@ class DealListIntegrationTest {
                 null,
                 0, 10);
 
-        // Deals in cat1 with price 100-200: dealId1 (149.99), dealId2 (99.99 - excluded), dealId5 (149.99)
-        // dealId2 is 99.99 so excluded by minPrice=100
+        // Deals in cat1 with price 100-200: deal1 (149.99), deal5 (149.99)
+        // deal2 is 99.99 so excluded by minPrice=100
         assertThat(page.getContent()).hasSize(2);
         assertThat(page.getContent()).extracting(DealOverview::id).containsExactlyInAnyOrder(dealId1, dealId5);
+    }
+
+    // ── Response structure verification ─────────────────────────────────────────
+
+    @Test
+    void listDeals_responseContainsOnlyDealFields() {
+        var page = dealService.listDeals(null, null, null, null, null, null, null, null, 0, 20);
+
+        for (DealOverview deal : page.getContent()) {
+            // Verify all 16 fields are present and non-null (except nullable ones)
+            assertThat(deal.id()).isNotNull();
+            assertThat(deal.productId()).isNotNull();
+            assertThat(deal.sellerId()).isNotNull();
+            assertThat(deal.categoryId()).isNotNull();
+            assertThat(deal.originalPrice()).isNotNull();
+            assertThat(deal.dealPrice()).isNotNull();
+            assertThat(deal.dealStock()).isGreaterThan(0);
+            assertThat(deal.currentParticipants()).isGreaterThanOrEqualTo(0);
+            assertThat(deal.minParticipants()).isGreaterThan(0);
+            assertThat(deal.authorizedCount()).isGreaterThanOrEqualTo(0);
+            assertThat(deal.status()).isNotNull();
+            assertThat(deal.durationMinutes()).isGreaterThan(0);
+            assertThat(deal.createdAt()).isNotNull();
+            // startTime and endTime can be null (for PENDING deals)
+        }
     }
 }

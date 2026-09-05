@@ -4,7 +4,6 @@ import com.groupdeal.dealservice.domain.DealStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -30,9 +29,5 @@ public record DealDetails(
         int durationMinutes,
         OffsetDateTime startTime,
         OffsetDateTime endTime,
-        OffsetDateTime createdAt,
-
-        // ── enriched from catalog (single-product endpoint) ─────────────────
-        String productDescription,
-        List<String> productImages
+        OffsetDateTime createdAt
 ) { }
