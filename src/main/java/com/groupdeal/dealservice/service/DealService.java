@@ -574,7 +574,26 @@ public class DealService {
     }
 
     // ── Analytics ───────────────────────────────────────────────────────────────
+    
+    // ── Seller facing ───
+    @Transactional(readOnly = true)
+    public SellerStatsResponse getSellerStats(UUID sellerId) {
+        Object[] stats = dealRepository.findSellerStats(sellerId);
+        
+        long activeDealCnt = ((Number) stats[0]).longValue();
+        BigDecimal totalRevenue = (BigDecimal) stats[1];
+        long participantsJoined = ((Number) stats[2]).longValue();
+        long succeededCnt = ((Number) stats[3]).longValue();
+        long failedCnt = ((Number) stats[4]).longValue();
+        
+        double avgCompletionRate = (succeededCnt + failedCnt) > 0
+                ? (double) succeededCnt / (succeededCnt + failedCnt)
+                : 0.0;
+        
+        return new SellerStatsResponse(activeDealCnt, totalRevenue, participantsJoined, avgCompletionRate);
+    }
 
+    // ── Admin facing ───
     @Transactional(readOnly = true)
     public DealAnalyticsResponse getAnalytics(UUID sellerId) {
         long total;

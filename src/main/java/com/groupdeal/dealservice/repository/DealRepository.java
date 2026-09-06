@@ -209,4 +209,17 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
             @Param("categoryId") UUID categoryId,
             @Param("minPrice") BigDecimal minPrice,
             @Param("maxPrice") BigDecimal maxPrice);
+
+    // ── Seller stats query ───────────────────────────────────────────────────────
+    @Query(value = """
+            SELECT
+                COUNT(CASE WHEN d.status IN ('ACTIVE', 'PENDING') THEN 1 END) as active_deal_cnt,
+                COALESCE(SUM(CASE WHEN d.status = 'SUCCEEDED' THEN d.deal_price * d.authorized_count ELSE 0 END), 0) as total_revenue,
+                COALESCE(SUM(CASE WHEN d.status = 'SUCCEEDED' THEN d.authorized_count ELSE 0 END), 0) as participants_joined,
+                COUNT(CASE WHEN d.status = 'SUCCEEDED' THEN 1 END) as succeeded_cnt,
+                COUNT(CASE WHEN d.status = 'FAILED' THEN 1 END) as failed_cnt
+            FROM deals d
+            WHERE d.seller_id = :sellerId
+            """, nativeQuery = true)
+    Object[] findSellerStats(@Param("sellerId") UUID sellerId);
 }

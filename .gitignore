@@ -17,3 +17,4 @@ target/
 start.sh
 stop.sh
 .apt_generated/
+.apt_generated_tests/

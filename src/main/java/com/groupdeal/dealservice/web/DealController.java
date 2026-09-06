@@ -65,6 +65,18 @@ public class DealController {
     }
 
     /**
+     * GET /deals/seller-stats
+     *
+     * IMPORTANT: this route MUST be declared before GET /deals/{id} so that Spring
+     * does not attempt to bind "seller-stats" as a UUID path variable.
+     */
+    @GetMapping("/seller-stats")
+    public SellerStatsResponse getSellerStats(
+            @RequestHeader("X-User-Id") UUID sellerId) {
+        return dealService.getSellerStats(sellerId);
+    }
+
+    /**
      * GET /deals — enriched paginated listing.
      *
      * All parameters are optional.
