@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +39,7 @@ class DealLifecycleIntegrationTest {
     @Container
     @SuppressWarnings("resource")
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+    		.withStartupTimeout(Duration.ofMinutes(3))
             .withDatabaseName("groupdeal_deals")
             .withUsername("groupdeal")
             .withPassword("groupdeal");
