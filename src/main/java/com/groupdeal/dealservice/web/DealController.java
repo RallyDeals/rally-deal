@@ -81,7 +81,11 @@ public class DealController {
      *
      * All parameters are optional.
      *
-     * @param search     filter by product name or seller name
+    /**
+     * GET /deals — enriched paginated listing.
+     *
+     * All parameters are optional.
+     *
      * @param categories list of category UUIDs
      * @param minPrice   minimum deal price (inclusive)
      * @param maxPrice   maximum deal price (inclusive)
@@ -94,7 +98,6 @@ public class DealController {
      */
     @GetMapping
     public ResponseEntity<Page<DealOverview>> listDeals(
-            @RequestParam(required = false) String search,
             @RequestParam(required = false) List<UUID> categories,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
@@ -105,7 +108,7 @@ public class DealController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(dealService.listDeals(
-                search, categories, minPrice, maxPrice, sort,
+                categories, minPrice, maxPrice, sort,
                 sellerId, status, productId, page, limit));
     }
 

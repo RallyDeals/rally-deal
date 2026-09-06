@@ -274,7 +274,6 @@ public class DealService {
      * Product enrichment is done in a single bulk call to the catalog service.
      * If catalog is unavailable the deals are returned with null product fields.
      *
-     * @param search        filter by product name or seller name (client-side post-filter after catalog call for stub; DB-side where possible)
      * @param categories    filter by one or more category UUIDs
      * @param minPrice      minimum deal price (inclusive)
      * @param maxPrice      maximum deal price (inclusive)
@@ -287,7 +286,6 @@ public class DealService {
      */
     @Transactional(readOnly = true)
     public Page<DealOverview> listDeals(
-            String search,
             List<UUID> categories,
             BigDecimal minPrice,
             BigDecimal maxPrice,
