@@ -14,6 +14,7 @@ import com.groupdeal.dealservice.mapper.DealMapper;
 import com.groupdeal.dealservice.repository.DealOutboxRepository;
 import com.groupdeal.dealservice.repository.DealRepository;
 import com.groupdeal.dealservice.repository.DealSlotRequestRepository;
+import com.groupdeal.dealservice.repository.SellerStatsProjection;
 import com.groupdeal.dealservice.web.dto.*;
 import com.rally.common.exceptions.domain.catalog.ProductNotFoundException;
 import com.rally.common.exceptions.domain.deal.DealCancellationNotAllowedException;
@@ -578,13 +579,13 @@ public class DealService {
     // ── Seller facing ───
     @Transactional(readOnly = true)
     public SellerStatsResponse getSellerStats(UUID sellerId) {
-        Object[] stats = dealRepository.findSellerStats(sellerId);
+        SellerStatsProjection stats = dealRepository.findSellerStats(sellerId);
         
-        long activeDealCnt = ((Number) stats[0]).longValue();
-        BigDecimal totalRevenue = (BigDecimal) stats[1];
-        long participantsJoined = ((Number) stats[2]).longValue();
-        long succeededCnt = ((Number) stats[3]).longValue();
-        long failedCnt = ((Number) stats[4]).longValue();
+        long activeDealCnt = ((Number) stats.getActiveDealCnt()).longValue();
+        BigDecimal totalRevenue = stats.getTotalRevenue();
+        long participantsJoined = ((Number) stats.getParticipantsJoined()).longValue();
+        long succeededCnt = ((Number) stats.getSucceededCnt()).longValue();
+        long failedCnt = ((Number) stats.getFailedCnt()).longValue();
         
         double avgCompletionRate = (succeededCnt + failedCnt) > 0
                 ? (double) succeededCnt / (succeededCnt + failedCnt)

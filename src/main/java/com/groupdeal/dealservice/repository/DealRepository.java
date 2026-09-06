@@ -221,5 +221,5 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
             FROM deals d
             WHERE d.seller_id = :sellerId
             """, nativeQuery = true)
-    Object[] findSellerStats(@Param("sellerId") UUID sellerId);
+    SellerStatsProjection findSellerStats(@Param("sellerId") UUID sellerId);
 }
