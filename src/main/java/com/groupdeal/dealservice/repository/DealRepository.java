@@ -222,4 +222,53 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
             WHERE d.seller_id = :sellerId
             """, nativeQuery = true)
     SellerStatsProjection findSellerStats(@Param("sellerId") UUID sellerId);
+
+    // ── Relevance sort query (computed score: discount*40 + momentum*30 + urgency*30) ───────────────────
+    @Query(value = """
+            SELECT d.*
+            FROM deals d
+            WHERE (:statuses IS NULL OR d.status IN :statuses)
+              AND (:sellerId IS NULL OR d.seller_id = :sellerId)
+              AND (:productId IS NULL OR d.product_id = :productId)
+              AND (:categoryId IS NULL OR d.category_id = :categoryId)
+              AND (:minPrice IS NULL OR d.deal_price >= :minPrice)
+              AND (:maxPrice IS NULL OR d.deal_price <= :maxPrice)
+            ORDER BY (
+                ((d.original_price - d.deal_price) / NULLIF(d.original_price, 0) * 40)
+                + (CAST(d.current_participants AS float) / NULLIF(d.deal_stock, 0) * 30)
+                + (CASE
+                     WHEN d.end_time IS NULL THEN 0
+                     WHEN d.end_time <= now() THEN 0
+                     ELSE GREATEST(0, 30 - (EXTRACT(EPOCH FROM (d.end_time - now())) / 3600))
+                   END)
+            ) DESC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Deal> findAllWithRelevanceSort(
+            @Param("statuses") List<String> statuses,
+            @Param("sellerId") UUID sellerId,
+            @Param("productId") UUID productId,
+            @Param("categoryId") UUID categoryId,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice,
+            @Param("limit") int limit,
+            @Param("offset") int offset);
+
+    @Query(value = """
+            SELECT count(*)
+            FROM deals d
+            WHERE (:statuses IS NULL OR d.status IN :statuses)
+              AND (:sellerId IS NULL OR d.seller_id = :sellerId)
+              AND (:productId IS NULL OR d.product_id = :productId)
+              AND (:categoryId IS NULL OR d.category_id = :categoryId)
+              AND (:minPrice IS NULL OR d.deal_price >= :minPrice)
+              AND (:maxPrice IS NULL OR d.deal_price <= :maxPrice)
+            """, nativeQuery = true)
+    long countWithRelevanceSortFilters(
+            @Param("statuses") List<String> statuses,
+            @Param("sellerId") UUID sellerId,
+            @Param("productId") UUID productId,
+            @Param("categoryId") UUID categoryId,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice);
 }

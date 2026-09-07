@@ -327,12 +327,34 @@ public class DealService {
         }
 
         // ── sorting ────────────────────────────────────────────────────────────────
-        Sort dbSort = resolveSort(sort);
-        PageRequest pageRequest = PageRequest.of(page, limit, dbSort);
+        boolean isRelevanceSort = sort == null || sort.isBlank() || "relevance".equalsIgnoreCase(sort);
+        boolean isDiscountSort = "discount".equalsIgnoreCase(sort);
 
         Page<Deal> dealPage;
-        boolean isDiscountSort = "discount".equalsIgnoreCase(sort);
-        if (isDiscountSort) {
+        if (isRelevanceSort) {
+            // Use native query with computed relevance score for proper sorting
+            // Native query supports 0 or 1 category; for multiple categories fall back to Specification
+            boolean useNativeQuery = categories == null || categories.isEmpty() || categories.size() == 1;
+            if (useNativeQuery) {
+                UUID categoryForSort = (categories != null && !categories.isEmpty()) ? categories.get(0) : null;
+                List<String> statusStrings = effectiveStatuses.stream().map(Enum::name).toList();
+                int offset = page * limit;
+                List<Deal> deals = dealRepository.findAllWithRelevanceSort(
+                        statusStrings, sellerId, productId, categoryForSort, minPrice, maxPrice, limit, offset);
+                long total = dealRepository.countWithRelevanceSortFilters(
+                        statusStrings, sellerId, productId, categoryForSort, minPrice, maxPrice);
+                PageRequest pageRequest = PageRequest.of(page, limit);
+                dealPage = new PageImpl<>(deals, pageRequest, total);
+            } else {
+                // Multiple categories: fall back to Specification-based query
+                Sort dbSort = Sort.by(Sort.Direction.DESC, "createdAt"); // placeholder, actual sort done in query
+                PageRequest pageRequest = PageRequest.of(page, limit, dbSort);
+                dealPage = dealRepository.findAll(spec, pageRequest);
+                // Note: This doesn't apply the relevance sort for multiple categories
+                // but maintains correct filtering. For full relevance sort with multiple
+                // categories, a more complex native query with array support would be needed.
+            }
+        } else if (isDiscountSort) {
             // Use native query with computed discount percentage for proper sorting
             // For category filter, use first category if multiple provided (simplification for native query)
             UUID categoryForDiscountSort = (categories != null && !categories.isEmpty()) ? categories.get(0) : null;
@@ -343,8 +365,11 @@ public class DealService {
                     statusStrings, sellerId, productId, categoryForDiscountSort, minPrice, maxPrice, limit, offset);
             long total = dealRepository.countWithDiscountSortFilters(
                     statusStrings, sellerId, productId, categoryForDiscountSort, minPrice, maxPrice);
+            PageRequest pageRequest = PageRequest.of(page, limit);
             dealPage = new PageImpl<>(deals, pageRequest, total);
         } else {
+            Sort dbSort = resolveSort(sort);
+            PageRequest pageRequest = PageRequest.of(page, limit, dbSort);
             dealPage = dealRepository.findAll(spec, pageRequest);
         }
 
@@ -355,14 +380,13 @@ public class DealService {
     // ── Sort resolution ──────────────────────────────────────────────────────────
 
     private Sort resolveSort(String sort) {
-        if (sort == null) return Sort.by(Sort.Direction.DESC, "createdAt");
         return switch (sort.toLowerCase()) {
             case "price-asc"    -> Sort.by(Sort.Direction.ASC,  "dealPrice");
             case "price-desc"   -> Sort.by(Sort.Direction.DESC, "dealPrice");
             case "ending-soon"  -> Sort.by(Sort.Direction.ASC,  "endTime");
             case "most-joined"  -> Sort.by(Sort.Direction.DESC, "currentParticipants");
             case "newest"       -> Sort.by(Sort.Direction.DESC, "createdAt");
-            default             -> Sort.by(Sort.Direction.DESC, "createdAt"); // relevance, discount & unknown
+            default             -> Sort.by(Sort.Direction.DESC, "createdAt"); // discount & unknown
         };
     }
 
