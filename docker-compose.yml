@@ -1,0 +1,70 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: groupdeal_deals
+      POSTGRES_USER: groupdeal
+      POSTGRES_PASSWORD: groupdeal
+    ports:
+      - "5435:5432"
+    volumes:
+      - deal-service-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U groupdeal -d groupdeal_deals"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:9093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+  deal-service:
+    build:
+      context: .
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR}
+      secrets:
+        - github_token
+    ports:
+      - "8081:8081"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: groupdeal_deals
+      DB_USER: groupdeal
+      DB_PASSWORD: groupdeal
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CATALOG_SERVICE_URL: http://catalog-service:8083
+      INVENTORY_SERVICE_URL: http://inventory-service:8087  # 👈 added this
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN
+
+volumes:
+  deal-service-pgdata:
+
+networks:
+  default:
+    name: groupdeal-net
+    external: true
