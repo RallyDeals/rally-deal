@@ -59,9 +59,8 @@ public class DealController {
      * does not attempt to bind "analytics" as a UUID path variable.
      */
     @GetMapping("/analytics")
-    public DealAnalyticsResponse getAnalytics(
-            @RequestHeader(value = "X-User-Id", required = false) UUID sellerId) {
-        return dealService.getAnalytics(sellerId);
+    public DealAnalyticsResponse getAnalytics() {
+        return dealService.getAnalytics();
     }
 
     /**

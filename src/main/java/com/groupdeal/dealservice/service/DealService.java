@@ -618,7 +618,7 @@ public class DealService {
 
     // ── Admin facing ───
     @Transactional(readOnly = true)
-    public DealAnalyticsResponse getAnalytics(UUID sellerId) {
+    public DealAnalyticsResponse getAnalytics() {
         long total;
         long activeDeals;  // ACTIVE + PENDING per spec
         long createdThisMonth;
@@ -632,23 +632,13 @@ public class DealService {
 
         List<DealStatus> activeStatuses = List.of(DealStatus.ACTIVE, DealStatus.PENDING);
 
-        if (sellerId != null) {
-            total             = dealRepository.countBySellerId(sellerId);
-            activeDeals       = dealRepository.countBySellerIdAndStatusIn(sellerId, activeStatuses);
-            createdThisMonth  = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, monthStart, OffsetDateTime.now());
-            createdToday      = dealRepository.countBySellerIdAndCreatedAtBetween(sellerId, dayStart, OffsetDateTime.now());
-            completedDeals    = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.SUCCEEDED);
-            failed            = dealRepository.countBySellerIdAndStatus(sellerId, DealStatus.FAILED);
-            succeeded         = completedDeals;
-        } else {
-            total             = dealRepository.count();
-            activeDeals       = dealRepository.countByStatusIn(activeStatuses);
-            createdThisMonth  = dealRepository.countByCreatedAtBetween(monthStart, OffsetDateTime.now());
-            createdToday      = dealRepository.countByCreatedAtBetween(dayStart, OffsetDateTime.now());
-            completedDeals    = dealRepository.countByStatus(DealStatus.SUCCEEDED);
-            failed            = dealRepository.countByStatus(DealStatus.FAILED);
-            succeeded         = completedDeals;
-        }
+        total = dealRepository.count();
+        activeDeals = dealRepository.countByStatusIn(activeStatuses);
+        createdThisMonth = dealRepository.countByCreatedAtBetween(monthStart, OffsetDateTime.now());
+        createdToday = dealRepository.countByCreatedAtBetween(dayStart, OffsetDateTime.now());
+        completedDeals = dealRepository.countByStatus(DealStatus.SUCCEEDED);
+        failed = dealRepository.countByStatus(DealStatus.FAILED);
+        succeeded = completedDeals;
 
         double successRate = (completedDeals + failed) > 0
                 ? (double) succeeded / (completedDeals + failed) * 100.0

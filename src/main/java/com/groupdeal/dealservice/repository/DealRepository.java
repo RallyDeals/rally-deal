@@ -155,14 +155,6 @@ public interface DealRepository extends JpaRepository<Deal, UUID>, JpaSpecificat
 
     // ── Analytics queries ───────────────────────────────────────────────────────
 
-    long countBySellerId(UUID sellerId);
-
-    long countBySellerIdAndStatus(UUID sellerId, DealStatus status);
-
-    long countBySellerIdAndCreatedAtBetween(UUID sellerId, OffsetDateTime from, OffsetDateTime to);
-
-    long countBySellerIdAndStatusIn(UUID sellerId, Collection<DealStatus> statuses);
-
     long countByStatus(DealStatus status);
 
     long countByCreatedAtBetween(OffsetDateTime from, OffsetDateTime to);
